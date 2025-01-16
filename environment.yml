@@ -1,0 +1,27 @@
+name: SheetMidiRetrieval
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.6
+  - numpy
+  - pandas
+  - scipy
+  - scikit-learn
+  - matplotlib
+  - seaborn
+  - librosa
+  - jupyter
+  - notebook
+  - pip
+  - pip:
+      - audioread
+      - dask
+      - joblib
+      - pretty-midi
+      - mido
+      - numba
+      - opencv-python
+      - resampy
+
+
