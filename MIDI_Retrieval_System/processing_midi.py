@@ -12,14 +12,14 @@ class MIDIProcessing:
     """
 
     # system parameters 
-    timeQuantFactor = 10
-    bootlegRepeatNotes = 2
-    bootlegFiller = 1
+    time_quant_factor = 10
+    bootleg_repeat_notes = 2
+    bootleg_filler = 1
 
     # positions of staff lines for right hand and left hand staves
-    staffLinesRH = [7,9,11,13,15]
-    staffLinesLH = [13,15,17,19,21]
-    staffLinesBoth = [13,15,17,19,21,35,37,39,41,43]
+    staff_lines_RH = [7,9,11,13,15]
+    staff_lines_LH = [13,15,17,19,21]
+    staff_lines_both = [13,15,17,19,21,35,37,39,41,43]
 
     def __init__(self, midifile: str):
         """
@@ -33,15 +33,15 @@ class MIDIProcessing:
         """
         print(f"Processing {self.midifile}")
 
-        note_events, _ = self.getNoteEvents(MIDIProcessing.timeQuantFactor)
-        bscore, times, num_notes, _, _ = self.generateBootlegScore(note_events, MIDIProcessing.bootlegRepeatNotes, MIDIProcessing.bootlegFiller)
+        note_events, _ = self.get_note_events(MIDIProcessing.time_quant_factor)
+        bscore, times, num_notes, _, _ = self.generate_bootleg_score(note_events, MIDIProcessing.bootleg_repeat_notes, MIDIProcessing.bootleg_filler)
         
         # saving to file
         d = {
                 'bscore': bscore,
                 'times': times,
                 'num_notes': num_notes,
-                'stafflines': MIDIProcessing.staffLinesBoth,
+                'stafflines': MIDIProcessing.staff_lines_both,
                 'note_events': note_events
             }
 
@@ -49,7 +49,7 @@ class MIDIProcessing:
             pickle.dump(d, file)
 
     @staticmethod
-    def processMidiBatch(file_list: str, outdir: str):
+    def process_midi_batch(file_list: str, outdir: str):
         """
         Process the batch of MIDI files specified in the list contained in file_list and store the results in outdir.
         """
@@ -63,7 +63,7 @@ class MIDIProcessing:
                 MIDIProcessing(f).process(outfile)
 
 
-    def getNoteEvents(self, quant: int = 10):
+    def get_note_events(self, quant: int = 10):
         """
         Return a list of (t_tick, t_sec, notes) tuples 
         representing simultaneous note events from the MIDI file.
@@ -83,7 +83,7 @@ class MIDIProcessing:
 
         # Load MIDI file
         mid = MidiFile(self.midifile)
-        noteEvents = []
+        note_events = []
 
         # Extract note onset information
         for track in mid.tracks: # a MIDI file can have multiple parallel tracks
@@ -91,18 +91,18 @@ class MIDIProcessing:
             for msg in track:
                 t += msg.time  # accumulate ticks since last event
                 if msg.type == 'note_on' and msg.velocity > 0:
-                    noteEvents.append((t, msg.note)) # msg.note is an int representing the MIDI note number (pitch in the range 0 to 127)
+                    note_events.append((t, msg.note)) # msg.note is an int representing the MIDI note number (pitch in the range 0 to 127)
     
         # Remove duplicates and sort note events from all tracks by tick time
-        sorted(set(noteEvents))
+        sorted(set(note_events))
 
         # Convert ticks to seconds using PrettyMIDI
         pm = PrettyMIDI(self.midifile)
-        noteOnsets = [(t_ticks, pm.tick_to_time(t_ticks), note) for (t_ticks, note) in noteEvents]
+        note_onsets = [(t_ticks, pm.tick_to_time(t_ticks), note) for (t_ticks, note) in note_events]
 
         # Group simultaneous notes based on quantized absolute tick time
         d = defaultdict(lambda: {'ticks': [], 'secs': [], 'notes': []})
-        for n in noteOnsets:
+        for n in note_onsets:
             t_quant = n[0] // quant  # Quantized time units (ticks)
             d[t_quant]['ticks'].append(n[0])
             d[t_quant]['secs'].append(n[1])
@@ -114,7 +114,7 @@ class MIDIProcessing:
         return result, d  # Return d for debugging
 
     @staticmethod
-    def getNoteheadPlacement(midinum: int, midi2loc: dict, dim: int):
+    def get_notehead_placement(midinum: int, midi2loc: dict, dim: int):
         """
         Given:
         - a MIDI note number 
@@ -130,17 +130,17 @@ class MIDIProcessing:
         return r
 
     @staticmethod
-    def getNoteheadPlacementMapping():
+    def get_notehead_placement_mapping():
         """
         Get the mappings from MIDI note numbers to possible note positions 
         in the staves for the right and the left hand.
         """
-        r = MIDIProcessing.getNoteheadPlacementMappingRH()
-        l = MIDIProcessing.getNoteheadPlacementMappingLH()
+        r = MIDIProcessing.get_notehead_placement_mapping_RH()
+        l = MIDIProcessing.get_notehead_placement_mapping_LH()
         return r, l
 
     @staticmethod
-    def getNoteheadPlacementMappingRH():
+    def get_notehead_placement_mapping_RH():
         """
         Get a dictionary where:
         - keys are MIDI note numbers
@@ -209,7 +209,7 @@ class MIDIProcessing:
         return d
 
     @staticmethod
-    def getNoteheadPlacementMappingLH():
+    def get_notehead_placement_mapping_LH():
         """
         Get a dictionary where:
         - keys are MIDI note numbers
@@ -267,7 +267,7 @@ class MIDIProcessing:
         d[67] = [27] # G4
         return d
     
-    def generateBootlegScore(self, noteEvents, repeatNotes = 1, filler = 1):
+    def generate_bootleg_score(self, noteEvents, repeatNotes = 1, filler = 1):
         """
         Generate a bootleg score as a NumPy matrix starting from simultaenous note events collected from a MIDI file.
         To improve empirical results, events are repeated and separated by empty filler columns.
@@ -276,9 +276,9 @@ class MIDIProcessing:
         lh_dim = 28 # notes included in the left hand staff: A1 to G4 (inclusive)
         rh = [] # list of arrays of size rh_dim
         lh = [] # list of arrays of size lh_dim
-        numNotes = [] # array with the number of simultaneous notes in each event
+        num_notes = [] # array with the number of simultaneous notes in each event
         times = [] # list of (tsec, ttick) tuples indicating the time in ticks and seconds for each event
-        mapR, mapL = MIDIProcessing.getNoteheadPlacementMapping() # maps from MIDI note numbers to locations on right and left hand staves
+        mapR, mapL = MIDIProcessing.get_notehead_placement_mapping() # maps from MIDI note numbers to locations on right and left hand staves
 
         for i, (ttick, tsec, notes) in enumerate(noteEvents):
 
@@ -287,7 +287,7 @@ class MIDIProcessing:
                 for _ in range(filler):
                     rh.append(np.zeros((rh_dim,1)))
                     lh.append(np.zeros((lh_dim,1)))
-                    numNotes.append(0)
+                    num_notes.append(0)
                 # get corresponding times using linear interpolation
                 interp_ticks = np.interp(np.arange(1, filler+1), [0, filler+1], [noteEvents[i-1][0], ttick])
                 interp_secs = np.interp(np.arange(1, filler+1), [0, filler+1], [noteEvents[i-1][1], tsec])
@@ -298,16 +298,16 @@ class MIDIProcessing:
             rhvec = np.zeros((rh_dim, 1))
             lhvec = np.zeros((lh_dim, 1))
             for midinum in notes:
-                rhvec += MIDIProcessing.getNoteheadPlacement(midinum, mapR, rh_dim)
-                lhvec += MIDIProcessing.getNoteheadPlacement(midinum, mapL, lh_dim)
+                rhvec += MIDIProcessing.get_notehead_placement(midinum, mapR, rh_dim)
+                lhvec += MIDIProcessing.get_notehead_placement(midinum, mapL, lh_dim)
             for _ in range(repeatNotes):
                 rh.append(rhvec)
                 lh.append(lhvec)
-                numNotes.append(len(notes))
+                num_notes.append(len(notes))
                 times.append((tsec, ttick))
 
         rh = np.clip(np.squeeze(np.array(rh)).T, 0, 1) # clip between 0 and 1 to avoid invalid values (in case e.g. E and F are played simultaneously)
         lh = np.clip(np.squeeze(np.array(lh)).T, 0, 1)
         both = np.vstack((lh, rh)) # shape: 62 x Y where Y = number of repeated simultanoeus note events in the MIDI file + filler columns
 
-        return both, times, numNotes, (rh, MIDIProcessing.staffLinesRH), (lh,  MIDIProcessing.staffLinesLH)
+        return both, times, num_notes, (rh, MIDIProcessing.staff_lines_RH), (lh,  MIDIProcessing.staff_lines_LH)

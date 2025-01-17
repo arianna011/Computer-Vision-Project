@@ -7,13 +7,13 @@ if __name__ == "__main__":
    
     # visualize bootleg score
     midi = MIDIProcessing(midifile)
-    result, _ =  midi.getNoteEvents(quant=10)
-    both, times, numNotes, _, _ = midi.generateBootlegScore(result, 2, 2)
+    result, _ =  midi.get_note_events(quant=10)
+    both, times, numNotes, _, _ = midi.generate_bootleg_score(result, 2, 2)
     bs = BootlegScore(both[:,0:140])
-    bs.visualize(staff_lines=MIDIProcessing.staffLinesBoth)
+    bs.visualize(staff_lines=MIDIProcessing.staff_lines_both)
 
     # process midi batch
     fileList = './cfg_files/midi.train.list' # list of all midi files to process
     outdir = 'experiments/train/db' # where to save bootleg scores
-    MIDIProcessing.processMidiBatch(fileList, outdir)
+    MIDIProcessing.process_midi_batch(fileList, outdir)
     
