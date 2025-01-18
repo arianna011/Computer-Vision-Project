@@ -1,19 +1,56 @@
-from MIDI_Retrieval_System import BootlegScore, MIDIProcessing
+from MIDI_Retrieval_System import BootlegScore, MIDIProcessing, QueryProcessing
+import matplotlib.pyplot as plt
 
-if __name__ == "__main__":
-
-    # random example
-    midifile = './data/midi/p91.mid'
-   
+def test_bootleg_score(midi_file):
     # visualize bootleg score
-    midi = MIDIProcessing(midifile)
+    midi = MIDIProcessing(midi_file)
     result, _ =  midi.get_note_events(quant=10)
     both, times, numNotes, _, _ = midi.generate_bootleg_score(result, 2, 2)
     bs = BootlegScore(both[:,0:140])
     bs.visualize(staff_lines=MIDIProcessing.staff_lines_both)
 
+def test_midi_processing():
     # process midi batch
     fileList = './cfg_files/midi.train.list' # list of all midi files to process
     outdir = 'experiments/train/db' # where to save bootleg scores
     MIDIProcessing.process_midi_batch(fileList, outdir)
+
+def test_query_pre_processing(img_file):
+    # visualize picture pre-processing step-by-step
+    q_proc = QueryProcessing(img_file)
+    new_img = q_proc.remove_background_lightning()
+    plt.imshow(q_proc.img)
+    plt.show()
+    plt.imshow(new_img)
+    plt.show()
+    line_sep, scores = q_proc.estimate_line_sep(QueryProcessing.est_line_sep_n_cols, QueryProcessing.est_line_sep_lower_bound, QueryProcessing.est_line_sep_upper_bound, QueryProcessing.est_line_sep_step)
+    print(f'Estimated line sep: {line_sep}')
+    h, w = q_proc.calculate_resized_dimensions(line_sep, QueryProcessing.target_line_sep)
+    print(f'Target dims: {h} x {w}')
+    resized_img = new_img.resize((w,h))
+    plt.imshow(resized_img)
+    plt.show()
+    print(f'Picture dims: {resized_img.height} x {resized_img.width}')
+
+def test_query_pre_processing_one_step(img_file):
+    # test the function that does all query pre-processing by itself
+    q_proc = QueryProcessing(img_file)
+    q_proc.pre_process_image()
+    img = q_proc.pre_processed_image
+    plt.imshow(img)
+    plt.show()
+    print(f'Picture dims: {img.height} x {img.width}')
+
+if __name__ == "__main__":
+
+    # random examples
+    midi_file = './data/midi/p91.mid'
+    img_file = 'data/queries/p1_q1.jpg'
+    midi_db_dir = 'experiments/train/db'
+
+    test_query_pre_processing(img_file)
+    test_query_pre_processing_one_step(img_file)
+
+    
+    
     
