@@ -94,7 +94,8 @@ class QueryProcessing:
         self.image_file = image_file
         self.img = Image.open(image_file)
         # convert the image to grayscale via the PIL library 
-        self.gray_img = Image.open(image_file).convert('L') # 'L' stands for 'luminance'
+        self.gray_img = self.img.convert('L') # 'L' stands for 'luminance'
+
 
     def pre_process_image(self):
         """
@@ -112,7 +113,7 @@ class QueryProcessing:
         self.pre_processed_image = self.pre_processed_image.resize((target_w, target_h))
 
 
-    def remove_background_lightning(self, filt_sz=5, thumbnail_w = 100, thumbnail_h = 100):
+    def remove_background_lightning(self, filt_sz: int = thumbnail_filter_size, thumbnail_w: int = thumbnail_w, thumbnail_h: int = thumbnail_h) -> Image.Image:
         """
         Subtract a blurred version of the grayscale image from the original one 
         in order to remove background lightning and reduce noise
@@ -148,7 +149,8 @@ class QueryProcessing:
             
         return filter
     
-    def estimate_line_sep(self, n_cols, low_bound, up_bound, step):
+
+    def estimate_line_sep(self, n_cols, low_bound, up_bound, step) -> tuple[int, np.ndarray]:
         """
         Estimate the spacing between staff lines by using multiple filters for different candidate spacings
         and considering the one that gives the highest response
@@ -177,12 +179,95 @@ class QueryProcessing:
         
         return estimated_line_sep, scores
     
-    def calculate_resized_dimensions(self, estimated_line_sep, desired_line_sep):
+
+    def calculate_resized_dimensions(self, estimated_line_sep, desired_line_sep) -> tuple[int, int]:
         """
         Get the dimensions of the image resized to have the spacing between adjacent staff lines equal to the desired quantity
         """
         cur_h, cur_w = self.gray_img.height, self.gray_img.width
         scale_factor = 1.0 * desired_line_sep / estimated_line_sep
         target_h = int(cur_h * scale_factor)
-        target_w = int(cur_w * scale_factor)    
+        target_w = int(cur_w * scale_factor)
         return target_h, target_w
+
+
+    def get_normalized_image(self) -> np.ndarray:
+        """
+        Apply background lighting removal and resizing to the gray scale image in order to normalize its values.
+
+        Returns:
+            (np.array): normalized image
+        """
+        img = self.remove_background_lightning()
+        
+        line_sep, _ = self.estimate_line_sep(n_cols    = self.est_line_sep_n_cols,
+                                             low_bound = self.est_line_sep_lower_bound, 
+                                             up_bound  = self.est_line_sep_upper_bound, 
+                                             step      = self.est_line_sep_step)
+        
+        target_h, target_w = self.calculate_resized_dimensions(estimated_line_sep = line_sep,
+                                                               desired_line_sep   = self.target_line_sep)
+
+        img = img.resize((target_w, target_h))
+        return 1 - np.array(img) / 255.0
+        
+
+    def show_grayscale_image(self, fig_size: tuple[int, int] = (10, 10), max_val: int = 1, inverted: bool = True):
+        """
+        Show the normalized gray scale image on screen.
+
+        Params:
+            fig_size (tuple[int, int]): size of the plot. Default: (10, 10)
+            max_val (int): value for inverting the black and white on the image. Default: 1
+            inverted (bool): show the inverted colors image or not. Default: True
+        """
+
+        plt.figure(figsize=fig_size)
+        
+        img = self.get_normalized_image()
+        if inverted:
+            plt.imshow(max_val - img, cmap = 'gray')
+        else:
+            plt.imshow(img, cmap = 'gray')
+        plt.show()
+
+
+    def morph_filter_rectangle(self, img: np.ndarray , kernel_height: int, kernel_width: int) -> np.ndarray:
+        """
+        < function's description here >
+
+        Params:
+            img (np.ndarray): image, usually normalized.
+            kernel_height (int): filter height
+            kernel_width (int): filter width
+
+        Returns:
+            (np.ndarray): result of the stuff here
+        """
+        kernel = np.ones((kernel_height, kernel_width), dtype = np.uint8)
+        
+        result = cv2.erode(img, kernel, iterations = 1)
+        result = cv2.dilate(result, kernel, iterations = 1)
+        return result
+
+
+    def isolate_staff_lines(self, img: np.ndarray, kernel_len: int, notbar_filter_len: int, notebar_removal: float) -> np.ndarray:
+        """
+        < function's description here >
+
+        Params:
+            img (np.ndarray): image
+            kernel_len (int): length of the filter
+            notbar_filter_len (int): aaa
+            notebar_removal (): aaa
+
+        Returns:
+            (np.ndarray): clipped something
+        """
+        norm_img = self.get_normalized_image()
+
+        lines = self.morph_filter_rectangle(img = norm_img, kernel_height = 1, kernel_width = self.morphFilterHorizLineSize) # isolate hor lines
+        notebars_only = self.morph_filter_rectangle(img = lines, kernel_height = self.notebarFiltLen, kernel_width = 1) # isolate thick notebars
+        result = np.clip(lines - notebar_removal * notebars_only, 0, None) # subtract out notebars
+        
+        return result
