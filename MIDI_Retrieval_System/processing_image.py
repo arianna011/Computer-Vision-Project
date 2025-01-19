@@ -19,15 +19,14 @@ import os
 import os.path
 #import pyximport; pyximport.install()
 import multiprocessing
+from MIDI_Retrieval_System.musical_object_detection import MusicalObjectDetection
 
 class QueryProcessing:
     """
     Process a cellphone picture of some lines of sheet music via classical computer vision techniques and convert it to a booleg score.
     """
 
-    ### System parameters 
-
-    ## Pre-processing
+    ## Pre-processing parameters
     # Background lightning removal
     thumbnail_w = 100  
     thumbnail_h = 100
@@ -38,15 +37,6 @@ class QueryProcessing:
     est_line_sep_upper_bound = 45
     est_line_sep_step = 1
     target_line_sep = 10.0
-
-    ## Staff Line Features
-    morphFilterHorizLineSize = 41
-    notebarFiltLen = 3
-    notebarRemoval = 0.9
-    calcStaveFeatureMap_NumCols = 10
-    calcStaveFeatureMap_LowerRange = 8.5
-    calcStaveFeatureMap_UpperRange = 11.75
-    calcStaveFeatureMap_Delta = 0.25
 
     ## Notehead Detection
     morphFilterCircleSizeReduce = 5
@@ -93,8 +83,51 @@ class QueryProcessing:
         """
         self.image_file = image_file
         self.img = Image.open(image_file)
+
         # convert the image to grayscale via the PIL library 
         self.gray_img = self.img.convert('L') # 'L' stands for 'luminance'
+        self.pre_processed_image = None
+
+        # link to an object that takes care of detecting musical elements on sheet music
+        self.object_detector = None
+
+    
+    @staticmethod
+    def normalize_and_invert_image(img) -> np.ndarray:
+        """
+        Normalize the input image to have values between 0 and 1 and then invert them.
+
+        Returns:
+            (np.array): normalized and inverted image
+        """
+        return 1 - np.array(img) / 255.0
+    
+
+    @staticmethod
+    def show_grayscale_image(img, fig_size = (10, 10), max_val = 1, inverted = True):
+        """
+        Show a gray scale image on screen.
+
+        Params:
+            img (np.ndarray): the image to show
+            fig_size (tuple[int, int]): size of the plot.
+            max_val (int): value for inverting the black and white on the image.
+            inverted (bool): show the inverted colors image or not.
+        """
+        plt.figure(figsize=fig_size)
+        if inverted:
+            plt.imshow(max_val - img, cmap = 'gray')
+        else:
+            plt.imshow(img, cmap = 'gray')
+        plt.show()
+
+
+    def get_normalized_pre_processed_image(self) -> np.ndarray:
+        """
+        Return the pre-processed image normalized to be a binary image.
+        """
+        if not self.pre_processed_image: self.pre_process_image()
+        return QueryProcessing.normalize_and_invert_image(self.pre_processed_image)            
 
 
     def pre_process_image(self):
@@ -126,7 +159,7 @@ class QueryProcessing:
 
 
     @staticmethod 
-    def get_staff_lines_filter(line_sep):
+    def get_staff_lines_filter(line_sep) -> np.ndarray:
         """
         Create a periodic array that represents a filter to detect staff lines at a certain distance from each other
         (the filter will have positive spikes around the positions where staff lines are expected
@@ -189,85 +222,3 @@ class QueryProcessing:
         target_h = int(cur_h * scale_factor)
         target_w = int(cur_w * scale_factor)
         return target_h, target_w
-
-
-    def get_normalized_image(self) -> np.ndarray:
-        """
-        Apply background lighting removal and resizing to the gray scale image in order to normalize its values.
-
-        Returns:
-            (np.array): normalized image
-        """
-        img = self.remove_background_lightning()
-        
-        line_sep, _ = self.estimate_line_sep(n_cols    = self.est_line_sep_n_cols,
-                                             low_bound = self.est_line_sep_lower_bound, 
-                                             up_bound  = self.est_line_sep_upper_bound, 
-                                             step      = self.est_line_sep_step)
-        
-        target_h, target_w = self.calculate_resized_dimensions(estimated_line_sep = line_sep,
-                                                               desired_line_sep   = self.target_line_sep)
-
-        img = img.resize((target_w, target_h))
-        return 1 - np.array(img) / 255.0
-        
-
-    def show_grayscale_image(self, fig_size: tuple[int, int] = (10, 10), max_val: int = 1, inverted: bool = True):
-        """
-        Show the normalized gray scale image on screen.
-
-        Params:
-            fig_size (tuple[int, int]): size of the plot. Default: (10, 10)
-            max_val (int): value for inverting the black and white on the image. Default: 1
-            inverted (bool): show the inverted colors image or not. Default: True
-        """
-
-        plt.figure(figsize=fig_size)
-        
-        img = self.get_normalized_image()
-        if inverted:
-            plt.imshow(max_val - img, cmap = 'gray')
-        else:
-            plt.imshow(img, cmap = 'gray')
-        plt.show()
-
-
-    def morph_filter_rectangle(self, img: np.ndarray , kernel_height: int, kernel_width: int) -> np.ndarray:
-        """
-        < function's description here >
-
-        Params:
-            img (np.ndarray): image, usually normalized.
-            kernel_height (int): filter height
-            kernel_width (int): filter width
-
-        Returns:
-            (np.ndarray): result of the stuff here
-        """
-        kernel = np.ones((kernel_height, kernel_width), dtype = np.uint8)
-        
-        result = cv2.erode(img, kernel, iterations = 1)
-        result = cv2.dilate(result, kernel, iterations = 1)
-        return result
-
-
-    def isolate_staff_lines(self, img: np.ndarray, kernel_len: int, notbar_filter_len: int, notebar_removal: float) -> np.ndarray:
-        """
-        < function's description here >
-
-        Params:
-            img (np.ndarray): image
-            kernel_len (int): length of the filter
-            notbar_filter_len (int): aaa
-            notebar_removal (): aaa
-
-        Returns:
-            (np.ndarray): clipped something
-        """
-        norm_img = self.get_normalized_image()
-
-        lines = self.morph_filter_rectangle(img = norm_img, kernel_height = 1, kernel_width = self.morphFilterHorizLineSize) # isolate hor lines
-        notebars_only = self.morph_filter_rectangle(img = lines, kernel_height = self.notebarFiltLen, kernel_width = 1) # isolate thick notebars
-        result = np.clip(lines - notebar_removal * notebars_only, 0, None) # subtract out notebars
-        
-        return result
