@@ -1,4 +1,4 @@
-from MIDI_Retrieval_System import BootlegScore, MIDIProcessing, QueryProcessing
+from MIDI_Retrieval_System import BootlegScore, MIDIProcessing, QueryProcessing, MusicalObjectDetection
 import matplotlib.pyplot as plt
 
 def test_bootleg_score(midi_file):
@@ -41,6 +41,28 @@ def test_query_pre_processing_one_step(img_file):
     plt.show()
     print(f'Picture dims: {img.height} x {img.width}')
 
+def test_staff_lines_detection(img_file):
+    proc = QueryProcessing(img_file)
+    img = proc.get_normalized_pre_processed_image()
+    det = MusicalObjectDetection(img)
+    res = det.isolate_staff_lines(img, 
+                                  MusicalObjectDetection.morph_filter_len, 
+                                  MusicalObjectDetection.notebar_filter_len, 
+                                  MusicalObjectDetection.notebar_removal)
+    proc.show_grayscale_image(res)
+
+    # Compute the staff feature map
+    featmap, stave_lens, col_w = det.compute_staff_feature_map(res, 
+                                                               MusicalObjectDetection.stave_feat_map_n_cols, 
+                                                               MusicalObjectDetection.stave_feat_map_lower_bound, 
+                                                               MusicalObjectDetection.stave_feat_map_upper_bound, 
+                                                               MusicalObjectDetection.stave_feat_map_step)
+    # Display the results
+    print("Feature Map Shape:", featmap.shape)
+    print("Stave Lengths:", stave_lens)
+    print("Column Width:", col_w)
+    proc.show_grayscale_image(featmap[0])
+
 if __name__ == "__main__":
 
     # random examples
@@ -48,8 +70,7 @@ if __name__ == "__main__":
     img_file = 'data/queries/p1_q1.jpg'
     midi_db_dir = 'experiments/train/db'
 
-    test_query_pre_processing(img_file)
-    test_query_pre_processing_one_step(img_file)
+    test_staff_lines_detection(img_file)
 
     
     
