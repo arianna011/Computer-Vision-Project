@@ -1,3 +1,5 @@
 data/
 __pycache__/
 experiments/
+
+.DS_Store
