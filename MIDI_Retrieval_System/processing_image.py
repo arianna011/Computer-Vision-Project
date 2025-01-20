@@ -3,10 +3,6 @@ from numpy.matlib import repmat
 import matplotlib.pyplot as plt
 from PIL import Image, ImageFilter, ImageChops
 import cv2
-#from skimage import filters, measure
-#from skimage.measure import label, regionprops
-#from skimage.color import label2rgb
-from sklearn.cluster import KMeans
 import matplotlib.patches as mpatches
 from scipy.signal import convolve2d
 from scipy.spatial import KDTree
@@ -38,35 +34,12 @@ class QueryProcessing:
     est_line_sep_step = 1
     target_line_sep = 10.0
 
-    ## Notehead Detection
-    morphFilterCircleSizeReduce = 5
-    morphFilterCircleSizeExpand = 5
-    #morphFilterCircleSize = 5
-    notedetect_minarea = 50
-    notedetect_maxarea = 200
-    noteTemplateSize = 21
-    notedetect_tol_ratio = .4
-    chordBlock_minH = 1.25
-    chordBlock_maxH = 4.25
-    chordBlock_minW = .8
-    chordBlock_maxW = 2.25
-    chordBlock_minArea = 1.8
-    chordBlock_maxArea = 4.5
-    chordBlock_minNotes = 2
-    chordBlock_maxNotes = 4
-
     ## Staffline Detection
     maxDeltaRowInitial = 50
     minNumStaves = 2
     maxNumStaves = 12
     minStaveSeparation = 6 * target_line_sep
     maxDeltaRowRefined = 15
-
-    ## Group Staves
-    morphFilterVertLineLength = 101
-    morphFilterVertLineWidth = 7
-    maxBarlineWidth = 15
-    #maxBarlineLenFactor = .25
 
     ## Generate Bootleg Score
     bootlegRepeatNotes = 2 
@@ -91,6 +64,18 @@ class QueryProcessing:
         # link to an object that takes care of detecting musical elements on sheet music
         self.object_detector = None
 
+    
+    def assign_detector(self) -> MusicalObjectDetection:
+        """
+        Create and assign a musical object detector for this QueryProcessing object 
+
+        Returns:
+            (MusicalObjectDetection): the created detector
+        """
+        det = MusicalObjectDetection(self, self.pre_process_image(), self.get_normalized_pre_processed_image())
+        self.object_detector = det
+        return det
+    
     
     @staticmethod
     def normalize_and_invert_image(img) -> np.ndarray:
@@ -122,18 +107,58 @@ class QueryProcessing:
         plt.show()
 
 
+    @staticmethod
+    def show_color_image(img, fig_size = (10, 10)):
+        """
+        Show an RGB image on screen.
+
+        Params:
+            img (np.ndarray): the image to show
+            fig_size (tuple[int, int]): size of the plot.
+        """
+        plt.figure(figsize=fig_size)
+        plt.imshow(img)
+        plt.show()
+
+    
+    @staticmethod
+    def show_img_with_bound_boxes(img, bboxes, fig_size = (10,10)):
+        """
+        Show an image with red bounding boxes on it on screen.
+
+        Params:
+            img (np.ndarray): the image to show
+            bboxes (list[tuple[int,int,int,int]]): list of bounding boxes to draw
+            fig_size (tuple[int, int]): size of the plot.
+        """
+        _, ax = plt.subplots(figsize=fig_size)
+        ax.imshow(img)
+
+        for (minr, minc, maxr, maxc) in bboxes:
+            rect = mpatches.Rectangle((minc, minr), maxc - minc, maxr - minr, fill=False, edgecolor='red', linewidth=2)
+            ax.add_patch(rect)
+
+        ax.set_axis_off()
+        plt.tight_layout()
+        plt.show()
+
+
     def get_normalized_pre_processed_image(self) -> np.ndarray:
         """
-        Return the pre-processed image normalized to be a binary image.
+        Returns:
+            (np.ndarray) the pre-processed image normalized to be a binary image
         """
         if not self.pre_processed_image: self.pre_process_image()
         return QueryProcessing.normalize_and_invert_image(self.pre_processed_image)            
 
 
-    def pre_process_image(self):
+    def pre_process_image(self) -> np.ndarray:
         """
         Pre-process a picture of sheet music by removing noise caused by background lightning conditions 
         and resizing the image in order to have the desired amount of pixels in the spacing between adjacent staff lines
+
+        Returns:
+            (np.ndarray) the pre-processed image
         """
         # remove background lightning to reduce noise
         self.pre_processed_image = self.remove_background_lightning()
@@ -144,6 +169,7 @@ class QueryProcessing:
                                                     QueryProcessing.est_line_sep_step)
         target_h, target_w = self.calculate_resized_dimensions(estimated_line_sep, QueryProcessing.target_line_sep)
         self.pre_processed_image = self.pre_processed_image.resize((target_w, target_h))
+        return self.pre_processed_image
 
 
     def remove_background_lightning(self, filt_sz: int = thumbnail_filter_size, thumbnail_w: int = thumbnail_w, thumbnail_h: int = thumbnail_h) -> Image.Image:
