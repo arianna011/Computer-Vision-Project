@@ -40,16 +40,23 @@ class MusicalObjectDetection:
     chord_specs = (chord_min_h, chord_max_h, chord_min_w, 
                    chord_max_w, chord_min_area, chord_max_area, 
                    chord_min_notes, chord_max_notes)
+    
+    # Bar Line Features
+    morph_filter_bar_vert = 101
+    morph_filter_bar_hor = 7
+    max_barline_width = 15
 
 
-    def __init__(self, norm_img):
+    def __init__(self, qproc, img, norm_img):
         """
-        Initialize the MusicalObjectDetection with a normalized image of sheet music.
+        Initialize the MusicalObjectDetection with the related QueryProcessing object, a grayscale pre-processed image and a normalized (binary) pre-processed image of sheet music.
         """
+        self.qproc = qproc
+        self.img = img
         self.norm_img = norm_img
 
-
-    def morph_filter_rectangle(self, img: np.ndarray , kernel_h: int, kernel_w: int) -> np.ndarray:
+    @staticmethod
+    def morph_filter_rectangle(img: np.ndarray , kernel_h: int, kernel_w: int) -> np.ndarray:
         """
         Perform erosion and dilation (morphological opening operation) on the input binary image
         with a rectangular filter
@@ -67,8 +74,8 @@ class MusicalObjectDetection:
         result = cv2.dilate(result, kernel, iterations = 1)
         return result
     
-
-    def morph_filter_circle(self, img: np.ndarray, sz_dilate: int = 5, sz_erode: int = 0) -> np.ndarray:
+    @staticmethod
+    def morph_filter_circle(img: np.ndarray, sz_dilate: int = 5, sz_erode: int = 0) -> np.ndarray:
         """
         Perform dilation and erosion (morphological closing operation) on the input binary image
         with a circular filter
@@ -91,7 +98,7 @@ class MusicalObjectDetection:
 
     ################################ STAFF LINES FEATURES ############################################
 
-    def isolate_staff_lines(self, img: np.ndarray, kernel_len: int, notbar_filter_len: int, notebar_removal: float) -> np.ndarray:
+    def isolate_staff_lines(self, kernel_len: int, notbar_filter_len: int, notebar_removal: float) -> np.ndarray:
         """
         Keep only the staff lines in a binary image of sheet music 
         by first applying erosion and dilation with an horizontal morphological filters
@@ -99,7 +106,6 @@ class MusicalObjectDetection:
         and then subtracting notebars (they survirve the first filtering since they are horizontal too)
 
         Params:
-            img (np.ndarray): binary image of sheet music
             kernel_len (int): length of the filter used for erosion and dilation
             notbar_filter_len (int): lenght of the filter used to isolate notebars
             notebar_removal (): percentage that determines at which extent the notebars are subtracted (e.g. notebar_removal = 1 means the notebars are fully subtracted)
@@ -108,7 +114,7 @@ class MusicalObjectDetection:
             (np.ndarray): binary image of sheet music with isolated staff lines
         """
 
-        lines = self.morph_filter_rectangle(img = img, kernel_h = 1, kernel_w = kernel_len) # isolate horizontal lines
+        lines = self.morph_filter_rectangle(img = self.norm_img, kernel_h = 1, kernel_w = kernel_len) # isolate horizontal lines
         notebars_only = self.morph_filter_rectangle(img = lines, kernel_h = notbar_filter_len, kernel_w = 1) # isolate thick notebars
         result = np.clip(lines - notebar_removal * notebars_only, 0, None) # subtract out notebars and clip to ensure there are no negative values
         
@@ -139,7 +145,8 @@ class MusicalObjectDetection:
                 combfilt[idx_above] = remainder
         return combfilt, stavelen
     
-    def compute_staff_feature_map(self, img, n_cols, lower_bound, upper_bound, step):
+    @staticmethod
+    def compute_staff_feature_map(img, n_cols, lower_bound, upper_bound, step):
         """
         Compute the feature map of the musical staff in a cellphone image (needed since lines could be not perfectly straight in the image)
         by dividing the input image into a fixed number of columns,
@@ -185,12 +192,12 @@ class MusicalObjectDetection:
     
 
     ################################ NOTEHEAD DETECTION ############################################
-    
-    def detect_notehead_blobs(self, img: np.ndarray, min_area: float = None, max_area: float = None, min_threshold: float = None, max_threshold: float = None, 
+
+    def detect_notehead_blobs(self, min_area: float = None, max_area: float = None, min_threshold: float = None, max_threshold: float = None, 
                             min_circularity: float = None, min_convexity: float = None, min_intertia_ratio: float = None) -> tuple[list[cv2.KeyPoint], np.ndarray]:
         """
         Use a simple blob detector to recognize noteheads, based on multiple optional factors such as area or circularity,
-        and draw the found keypoints on the input image
+        and draw the found keypoints on the eroded and dilated pre-processed image of sheet music
 
         Params:
             img (np.ndarray): image to apply the blob detector on
@@ -207,6 +214,8 @@ class MusicalObjectDetection:
             (np.ndarray): the image with drawn keypoints
                 
         """
+
+        img = MusicalObjectDetection.morph_filter_circle(self.img, MusicalObjectDetection.morph_filter_circ_dilate, MusicalObjectDetection.morph_filter_circ_erode)
 
         # define blob detector parameters
         params = cv2.SimpleBlobDetector_Params()
@@ -249,13 +258,12 @@ class MusicalObjectDetection:
         return keypoints, im_with_keypoints 
     
 
-    def get_note_template(self, img: np.ndarray, keypoints: list[cv2.KeyPoint], sz: int) -> tuple[np.ndarray, int]:
+    def get_note_template(self, keypoints: list[cv2.KeyPoint], sz: int) -> tuple[np.ndarray, int]:
         """
-        Compute an estimate of how a notehead looks like in the given image (template)
+        Compute an estimate (template) of how a notehead looks like in the eroded and dilated normalized pre-processed image
         by taking the average of cropped regions around detected noteheads
 
         Params:
-            img (np.ndarray): the input image 
             keypoints (list[cv2.KeyPoint]): the list of keypoints resulting from notehead detection on the image
             sz (int): the size of the template
 
@@ -264,6 +272,9 @@ class MusicalObjectDetection:
             (int): the number of crops used
 
         """
+        img = MusicalObjectDetection.morph_filter_circle(self.img, MusicalObjectDetection.morph_filter_circ_dilate, MusicalObjectDetection.morph_filter_circ_erode)
+        img = self.qproc.normalize_and_invert_image(img)
+
         template = np.zeros((sz,sz))
         L = (sz - 1)//2 # used to define a crop region
         numCrops = 0
@@ -406,13 +417,12 @@ class MusicalObjectDetection:
             bboxes.append((rmin, cmin, rmax, cmax))
         return bboxes
 
-    def adaptive_notehead_detect(self, img: np.ndarray, template: np.ndarray, note_tol_ratio: float, 
+    def adaptive_notehead_detect(self, template: np.ndarray, note_tol_ratio: float, 
                                  chord_block_specs: tuple[float, float, float, float, float, float, int, int]) -> tuple[list[tuple[int,int,int,int]], np.ndarray]:
         """
-        Detect noteheads in an image, by considering both isolated noteheads and noteheads in chord blocks
+        Detect noteheads in the normalized image, by considering both isolated noteheads and noteheads in chord blocks
 
         Params:
-            img (np.ndarray): input image to detect noteheads on
             template (np.ndarray): template of a notehead
             chord_block_specs (tuple[float, float, float, float, float, float, int, int]): min and max values for height, width, area and number of notes of a chord
 
@@ -421,6 +431,8 @@ class MusicalObjectDetection:
                                           (each bounding box contains row minimum, column minimum, row maximum, column maximum)
             (np.ndarray): binarized version of the input image                           
         """
+        img = MusicalObjectDetection.morph_filter_circle(self.img, MusicalObjectDetection.morph_filter_circ_dilate, MusicalObjectDetection.morph_filter_circ_erode)
+        img = self.qproc.normalize_and_invert_image(img)
 
         binarized, thresh = MusicalObjectDetection.binarize_otsu(img)
         template_specs = MusicalObjectDetection.get_note_template_specs(template, thresh)
@@ -458,3 +470,28 @@ class MusicalObjectDetection:
         mean_heights = int(np.ceil(np.mean(heights)))
         mean_widths = int(np.ceil(np.mean(widths)))
         return center_coords, mean_heights, mean_widths
+    
+    
+    ################################ BARLINE FEATURES ############################################
+    
+    def isolate_bar_lines(self, vert_filter: int, hor_filter: int, max_barline_width: int) -> np.ndarray:
+        """
+        Compute features about the location of bar lines in the normalized image,
+        by first applying a dilation in the horizontal direction to expand bar lines that are not perfectly vertical,
+        then performing erosion and dilation in the vertical direction to isolate bar lines,
+        removing components that are too tick to be barlines
+
+        Params:
+            vert_filter (int): the dimension of the kernel for the vertical erosion and dilation
+            hor_filter (int): the dimension of the kernel for the horizontal dilation
+
+        Returns:
+            (np.ndarray): a binary image with isolated bar lines
+
+        """
+        hor_kernel = np.ones((1, hor_filter), np.uint8) # dilate first to catch warped barlines
+        vlines = cv2.dilate(self.norm_img, hor_kernel, iterations = 1)
+        vlines = self.morph_filter_rectangle(vlines, vert_filter, 1) # then filter for tall vertical lines
+        nonbarlines = self.morph_filter_rectangle(vlines, 1, max_barline_width) # extract elements that are too thick to be barlines
+        vlines = np.clip(vlines - nonbarlines, 0, 1)
+        return vlines

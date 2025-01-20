@@ -34,19 +34,12 @@ class QueryProcessing:
     est_line_sep_step = 1
     target_line_sep = 10.0
 
-
     ## Staffline Detection
     maxDeltaRowInitial = 50
     minNumStaves = 2
     maxNumStaves = 12
     minStaveSeparation = 6 * target_line_sep
     maxDeltaRowRefined = 15
-
-    ## Group Staves
-    morphFilterVertLineLength = 101
-    morphFilterVertLineWidth = 7
-    maxBarlineWidth = 15
-    #maxBarlineLenFactor = .25
 
     ## Generate Bootleg Score
     bootlegRepeatNotes = 2 
@@ -71,6 +64,18 @@ class QueryProcessing:
         # link to an object that takes care of detecting musical elements on sheet music
         self.object_detector = None
 
+    
+    def assign_detector(self) -> MusicalObjectDetection:
+        """
+        Create and assign a musical object detector for this QueryProcessing object 
+
+        Returns:
+            (MusicalObjectDetection): the created detector
+        """
+        det = MusicalObjectDetection(self, self.pre_process_image(), self.get_normalized_pre_processed_image())
+        self.object_detector = det
+        return det
+    
     
     @staticmethod
     def normalize_and_invert_image(img) -> np.ndarray:

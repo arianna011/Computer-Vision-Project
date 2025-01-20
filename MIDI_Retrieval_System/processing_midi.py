@@ -267,7 +267,7 @@ class MIDIProcessing:
         d[67] = [27] # G4
         return d
     
-    def generate_bootleg_score(self, noteEvents, repeatNotes = 1, filler = 1):
+    def generate_bootleg_score(self, note_events, repeat_notes = 1, filler = 1):
         """
         Generate a bootleg score as a NumPy matrix starting from simultaenous note events collected from a MIDI file.
         To improve empirical results, events are repeated and separated by empty filler columns.
@@ -280,7 +280,7 @@ class MIDIProcessing:
         times = [] # list of (tsec, ttick) tuples indicating the time in ticks and seconds for each event
         mapR, mapL = MIDIProcessing.get_notehead_placement_mapping() # maps from MIDI note numbers to locations on right and left hand staves
 
-        for i, (ttick, tsec, notes) in enumerate(noteEvents):
+        for i, (ttick, tsec, notes) in enumerate(note_events):
 
             # insert empty filler columns between note events
             if i > 0:
@@ -289,8 +289,8 @@ class MIDIProcessing:
                     lh.append(np.zeros((lh_dim,1)))
                     num_notes.append(0)
                 # get corresponding times using linear interpolation
-                interp_ticks = np.interp(np.arange(1, filler+1), [0, filler+1], [noteEvents[i-1][0], ttick])
-                interp_secs = np.interp(np.arange(1, filler+1), [0, filler+1], [noteEvents[i-1][1], tsec])
+                interp_ticks = np.interp(np.arange(1, filler+1), [0, filler+1], [note_events[i-1][0], ttick])
+                interp_secs = np.interp(np.arange(1, filler+1), [0, filler+1], [note_events[i-1][1], tsec])
                 for tup in zip(interp_secs, interp_ticks):
                     times.append((tup[0], tup[1]))
 
@@ -300,7 +300,7 @@ class MIDIProcessing:
             for midinum in notes:
                 rhvec += MIDIProcessing.get_notehead_placement(midinum, mapR, rh_dim)
                 lhvec += MIDIProcessing.get_notehead_placement(midinum, mapL, lh_dim)
-            for _ in range(repeatNotes):
+            for _ in range(repeat_notes):
                 rh.append(rhvec)
                 lh.append(lhvec)
                 num_notes.append(len(notes))
