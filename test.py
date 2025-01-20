@@ -46,7 +46,7 @@ def test_staff_lines_detection(img_file):
     img = proc.get_normalized_pre_processed_image()
     det = MusicalObjectDetection(img)
     res = det.isolate_staff_lines(img, 
-                                  MusicalObjectDetection.morph_filter_len, 
+                                  MusicalObjectDetection.morph_filter_rect_len, 
                                   MusicalObjectDetection.notebar_filter_len, 
                                   MusicalObjectDetection.notebar_removal)
     proc.show_grayscale_image(res)
@@ -63,6 +63,37 @@ def test_staff_lines_detection(img_file):
     print("Column Width:", col_w)
     proc.show_grayscale_image(featmap[0])
 
+
+def test_notehead_detection(img_file):
+
+    proc = QueryProcessing(img_file)
+    img = proc.pre_process_image()
+    det = MusicalObjectDetection(img)
+
+    # test erosion and dilation
+    res = det.morph_filter_circle(img, MusicalObjectDetection.morph_filter_circ_dilate, MusicalObjectDetection.morph_filter_circ_erode)
+    proc.show_grayscale_image(res, max_val=255, inverted=False)
+
+    # test blob detector
+    keypoints, img_with_keypoints = det.detect_notehead_blobs(res, min_area=MusicalObjectDetection.note_detect_min_area, max_area = MusicalObjectDetection.note_detect_max_area)
+    proc.show_color_image(img_with_keypoints)
+
+    # test notehead template computing
+    norm = proc.normalize_and_invert_image(res)
+    note_template, n_crops = det.get_note_template(norm, keypoints, MusicalObjectDetection.note_template_size)
+    print(f'Number of crops: {n_crops}')
+    proc.show_grayscale_image(note_template, (3,3))
+
+    # test adaptive notehead detection
+    notes, img_bin_notes = det.adaptive_notehead_detect(norm, note_template, MusicalObjectDetection.note_detect_tol_ratio, MusicalObjectDetection.chord_specs)
+    proc.show_img_with_bound_boxes(img_bin_notes, notes)
+
+    coords, h_mean, w_mean = MusicalObjectDetection.get_notehead_info(notes)
+    print("Center coordinates: ", coords)
+    print("Average height: ", h_mean)
+    print("Average width: ", w_mean)
+
+
 if __name__ == "__main__":
 
     # random examples
@@ -70,7 +101,7 @@ if __name__ == "__main__":
     img_file = 'data/queries/p1_q1.jpg'
     midi_db_dir = 'experiments/train/db'
 
-    test_staff_lines_detection(img_file)
+    test_notehead_detection(img_file)
 
     
     
