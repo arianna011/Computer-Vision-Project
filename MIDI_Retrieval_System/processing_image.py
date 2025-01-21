@@ -16,6 +16,7 @@ import os.path
 #import pyximport; pyximport.install()
 import multiprocessing
 from MIDI_Retrieval_System.musical_object_detection import MusicalObjectDetection
+from sklearn.cluster import KMeans
 
 class QueryProcessing:
     """
@@ -34,14 +35,14 @@ class QueryProcessing:
     est_line_sep_step = 1
     target_line_sep = 10.0
 
-    ## Staffline Detection
-    maxDeltaRowInitial = 50
-    minNumStaves = 2
-    maxNumStaves = 12
-    minStaveSeparation = 6 * target_line_sep
-    maxDeltaRowRefined = 15
+    ## Staffline Detection parameters
+    max_delta_row_initial = 50
+    min_num_staves = 2
+    max_num_staves = 12
+    min_stave_separation = 6 * target_line_sep
+    max_delta_row_refined = 15
 
-    ## Generate Bootleg Score
+    ## Bootleg Score Generation parameters
     bootlegRepeatNotes = 2 
     bootlegFiller = 1
 
@@ -248,3 +249,215 @@ class QueryProcessing:
         target_h = int(cur_h * scale_factor)
         target_w = int(cur_w * scale_factor)
         return target_h, target_w
+    
+
+    ########################################## QUERY BOOTLEG PROJECTION #################################################
+
+    @staticmethod
+    def estimate_staff_line_locs(featmap: np.ndarray, notehead_locs: list[tuple[int,int,int,int]], stave_lens: np.ndarray, col_width: int, 
+                                 delta_row_max: int, global_offset: int | list = 0) -> tuple[list[tuple[int, int, int, int, int]], int]:
+        """
+        Estimate the position of staff lines locally in context regions around noteheads.
+
+        Params:
+            featmap (np.ndarray): the staff feature map (of dimensions K x H x C, where K = number of comb filters, H = height of image in pixels, C = number of columns)
+            notehead_locs (list[tuple[int,int,int,int]]): list of bounding boxes of single noteheads 
+                                                          (each bounding box contains row minimum, column minimum, row maximum, column maximum)
+            stave_lens (np.ndarray): an array containing the staff lenghts for each different considered spacing between staff lines
+            col_width (int): whe width of each column in the feature map, used to determine which column a point falls into
+            delta_row_max (int): maximum row offset around a point to consider when searching for the staff line in the feature map
+            global_offset (int or list): an offset applied to the row range when searching for staff lines; if a scalar is passed, it is applied uniformly; 
+                                         otherwise, a list allows specifying unique offsets for each notehead location
+
+        Returns:
+            (list[tuple[int, int, int, int, int]]): the list of predictions for the locations of the staff lines
+                                                    (each prediction contains row start, row end, column and row of local region, index of filter for spacing)
+            (int): estimated staff line filter length (computed as the median of all staff lengths)
+        """
+        preds = []
+        if np.isscalar(global_offset):
+            global_offset = [global_offset] * len(notehead_locs) # convert a single value to a list
+
+        for i, nh_loc in enumerate(notehead_locs):
+            r = int(np.round(nh_loc[0]))
+            c = int(np.round(nh_loc[1]))
+            r_upper = min(r + delta_row_max + 1 + global_offset[i], featmap.shape[1])
+            r_lower = max(r - delta_row_max + global_offset[i], 0)
+            featmap_idx = c // col_width
+            local_region = np.squeeze(featmap[:, r_lower:r_upper, featmap_idx])
+            # take the peak in the local region as the most likely staff line
+            spacing_idx, row_offset = np.unravel_index(local_region.argmax(), local_region.shape) # convert index for flattened array in an index for a tensor
+            r_start = r_lower + row_offset
+            r_end = r_start + stave_lens[spacing_idx] - 1
+            preds.append((r_start, r_end, c, r, spacing_idx))
+
+        staff_filter_len = int(np.round(np.median([stave_lens[tup[4]] for tup in preds]))) # estimated staff length
+        return preds, staff_filter_len
+    
+    @staticmethod
+    def visualize_pred_staff_lines(preds: list[tuple[int, int, int, int, int]], img: np.ndarray, fig_sz: tuple[int, int] = (15,15)):
+        """
+        Show the staff lines in the list in input on the given image.
+
+        Params:
+            preds (list[tuple[int, int, int, int, int]]): the list of predictions for the locations of the staff lines
+                                                          (each prediction contains row start, row end, column and row of local region, index of filter for spacing)
+            img (np.ndarray): the image to show staff lines on
+            fig_sz (tuple[int, int]): size of the figure
+        """
+
+        plt.figure(figsize=fig_sz)
+        plt.imshow(1 - img, cmap = 'gray')
+        rows1 = np.array([pred[0] for pred in preds]) # top staff line
+        rows2 = np.array([pred[1] for pred in preds]) # bottom staff line
+        cols = np.array([pred[2] for pred in preds]) # notehead col
+        rows3 = np.array([pred[3] for pred in preds]) # notehead row
+        plt.scatter(cols, rows1, c = 'r', s = 3)
+        plt.scatter(cols, rows2, c = 'b', s = 3)
+        plt.scatter(cols, rows3, c = 'y', s = 3)
+        plt.show()
+
+    @staticmethod
+    def estimate_staff_midpoints(preds: list[tuple[int, int, int, int, int]], clusters_min: int, clusters_max: int, threshold: int) -> np.ndarray:
+        """
+        Estimate vertical staff midpoints locations globally by clustering local estimations with k-means,
+        increasing the number of clusters until the minimum distance between two centroids falls below the threshold
+
+        Params:
+            preds (list[tuple[int, int, int, int, int]]): the list of predictions for the locations of the staff lines
+                                                          (each prediction contains row start, row end, column and row of local region, index of filter for spacing)
+            clusters_min (int): lower bound for the number of clusters
+            clusters_max (int): upper bound for the number of clusters
+            threshold (int): minimum distance between two staves
+
+        Returns:
+            (np.ndarray): a sorted array of estimated staff line midpoints based on the best clustering model
+        """
+        r = np.array([.5*(tup[0] + tup[1]) for tup in preds]) # midpts of estimated stave locations
+        models = []
+        for num_clusters in range(clusters_min, clusters_max + 1):
+            kmeans = KMeans(n_clusters=num_clusters, n_init=1, random_state = 0).fit(r.reshape(-1,1))
+            sorted_list = np.array(sorted(np.squeeze(kmeans.cluster_centers_)))
+            mindiff = np.min(sorted_list[1:] - sorted_list[0:-1])
+            if num_clusters > clusters_min and mindiff < threshold:
+                break
+            models.append(kmeans)
+        
+        return np.sort(np.squeeze(models[-1].cluster_centers_))
+    
+    @staticmethod
+    def visualize_staff_midpoint_clustering(preds: list[tuple[int, int, int, int, int]], centers: np.ndarray):
+        """
+        Visually represent the clustering process for vertical staff line midpoints
+        (the number of cluster centers estimates the number of staves in an image).
+
+        Params:
+            preds (list[tuple[int, int, int, int, int]]): the list of predictions for the locations of the staff lines
+                                                          (each prediction contains row start, row end, column and row of local region, index of filter for spacing)
+            centers (np.ndarray): a sorted array of estimated staff line midpoints based on the best clustering model
+        """
+        r = np.array([.5*(tup[0] + tup[1]) for tup in preds]) # midpts of estimated stave locations
+        y_values = np.random.uniform(low=0.4, high=0.6, size=len(r))
+        plt.plot(r, y_values, '.', label='Predicted Midpoints')
+        plt.xlabel("Estimated Staff Line Midpoints")
+        plt.ylabel("Random Spread (for visualization)")
+        plt.title("Staff Line Midpoint Clustering")
+        for center in centers:
+            plt.axvline(x=center, color='r', label='Cluster center')
+        plt.legend()
+        plt.show()
+
+    @staticmethod
+    def assign_noteheads_to_staves(nh_locs: list[tuple[int,int,int,int]], stave_centers: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Assign noteheads to the nearest staff based on the vertical distance between their row locations and the centers of the staves
+
+        Params:
+            nh_locs (list[tuple[int,int,int,int]]): list of bounding boxes of single noteheads 
+                                                    (each bounding box contains row minimum, column minimum, row maximum, column maximum)
+            stave_centers (np.ndarray): a 1D array of vertical positions representing the centers of the staves
+
+        Returns:
+            (np.ndarray): array of indices indicating which staff each notehead is closest to
+            (np.ndarray): array of vertical offsets (row difference) between each notehead and the center of its assigned staff.
+        """
+        # matrix where each row corresponds to the row positions of all noteheads, repeated for the number of staves
+        nh_rows = np.matlib.repmat([tup[0] for tup in nh_locs], len(stave_centers), 1) # len(centers) x len(nh_locs)
+        # matrix where each column corresponds to the vertical positions of all staves, repeated for the number of noteheads
+        centers = np.matlib.repmat(stave_centers.reshape((-1,1)), 1, len(nh_locs)) # len(centers) x len(nh_locs)
+        stave_idxs = np.argmin(np.abs(nh_rows - centers), axis=0)
+        offsets = stave_centers[stave_idxs] - nh_rows[0,:] # row offset between note and staff midpoint
+        return stave_idxs, offsets
+    
+    @staticmethod
+    def visualize_clusters(img: np.ndarray, nhlocs: list[tuple[int,int,int,int]], clusters: np.ndarray, fig_sz: tuple[int,int] = (10,10)):
+        """
+        Visualize notehead clusters on the input image
+
+        Params:
+            img (np.ndarray): input grayscale image where noteheads are located
+            nh_locs (list[tuple[int,int,int,int]]): list of bounding boxes of single noteheads 
+                                                    (each bounding box contains row minimum, column minimum, row maximum, column maximum)
+            clusters(np.ndarray): array of indices indicating which staff each notehead is closest to
+            fig_sz (tuple[int, int]): figure size
+        """
+        plt.figure(figsize=fig_sz)
+        plt.imshow(1 - img, cmap = 'gray')
+        rows = np.array([tup[0] for tup in nhlocs])
+        cols = np.array([tup[1] for tup in nhlocs])
+        plt.scatter(cols, rows, c=clusters) # assign colors to points based on their cluster assignment
+        for i in range(len(clusters)):
+            plt.text(cols[i], rows[i] - 15, str(clusters[i]), fontsize = 12, color='red') # annotate each point with cluster label
+        plt.xlabel("Column Position")
+        plt.ylabel("Row Position")
+        plt.title("Notehead Clusters")
+        plt.show()
+    
+    @staticmethod
+    def estimate_note_labels(preds: list[tuple[int, int, int, int, int]]) -> list[int]:
+        """
+        Estimate notes positions on the musical staff based on the vertical alignment of noteheads with respect to their corresponding staff's midpoints
+        
+        Params:
+            preds (list[tuple[int, int, int, int, int]]): the list of predictions for the locations of the staff lines
+                                                          (each prediction contains row start, row end, column and row of local region, index of filter for spacing)
+
+        Returns:
+            (list[int]): list of predicted note positions on the staff
+        """
+        nh_vals = [] # estimated note labels
+        for _, (r_start, r_end, _, r, _) in enumerate(preds):
+            # if a stave has height L, there are 8 stave locations in (L-1) pixel rows
+            stave_midpt = .5 * (r_start + r_end)
+            # relative location of the note w. r. t. the staff midpoint
+            note_stave_loc = -1.0 * (r - stave_midpt) * 8 / (r_end - r_start) # negative values represent notes below the midpoint
+            nh_val = int(np.round(note_stave_loc))
+            nh_vals.append(nh_val)
+        return nh_vals
+    
+    @staticmethod
+    def visualize_note_labels(img: np.ndarray, vals: list[int], nh_locs: list[tuple[int,int,int,int]], fig_sz: tuple[int, int] = (10,10)):
+        """
+        Display the input image with noteheads labelled with their positions on the staff.
+
+        Params:
+            img (np.ndarray): grayscale image to display
+            vals (list[int]): list of note labels corresponding to the noteheads' positions
+            nh_locs (list[tuple[int,int,int,int]]): list of bounding boxes of single noteheads 
+                                                    (each bounding box contains row minimum, column minimum, row maximum, column maximum)
+            fig_sz (tuple[int, int]): size of the figure to display
+        """
+        plt.figure(figsize=fig_sz)
+        plt.imshow(1 - img, cmap = 'gray')
+        rows = np.array([loc[0] for loc in nh_locs])
+        cols = np.array([loc[1] for loc in nh_locs])
+        plt.scatter(cols, rows, color='blue') # show notehead positions with blue dots
+        for i in range(len(rows)):
+            plt.text(cols[i], rows[i] - 15, str(vals[i]), fontsize = 12, color='red') # annotate with note positions in red
+        plt.xlabel("Column Position")
+        plt.ylabel("Row Position")
+        plt.title("Annotated Noteheads")
+        plt.show()
+    
+
+    

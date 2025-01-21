@@ -101,8 +101,60 @@ def test_barline_detection(img_file):
     proc.show_grayscale_image(vlines)
 
 
-###################################################################à
+##################### TEST QUERY BOOTLEG PROJECTION ##########################
 
+def test_local_staff_estimation(img_file):
+    proc = QueryProcessing(img_file)
+    det = proc.assign_detector()
+    hlines = det.isolate_staff_lines(MusicalObjectDetection.morph_filter_rect_len, 
+                                  MusicalObjectDetection.notebar_filter_len, 
+                                  MusicalObjectDetection.notebar_removal)
+    # Detect noteheads
+    hlines = MusicalObjectDetection.morph_filter_circle(det.img, MusicalObjectDetection.morph_filter_circ_dilate, MusicalObjectDetection.morph_filter_circ_erode)
+    keypoints, _ = det.detect_notehead_blobs(min_area=MusicalObjectDetection.note_detect_min_area, max_area = MusicalObjectDetection.note_detect_max_area)
+
+    # test notehead template computing
+    note_template, _ = det.get_note_template(keypoints, MusicalObjectDetection.note_template_size)
+    notes, _ = det.adaptive_notehead_detect(note_template, MusicalObjectDetection.note_detect_tol_ratio, MusicalObjectDetection.chord_specs)
+
+    # Compute the staff feature map
+    featmap, stave_lens, col_w = MusicalObjectDetection.compute_staff_feature_map(hlines, 
+                                                               MusicalObjectDetection.stave_feat_map_n_cols, 
+                                                               MusicalObjectDetection.stave_feat_map_lower_bound, 
+                                                               MusicalObjectDetection.stave_feat_map_upper_bound, 
+                                                               MusicalObjectDetection.stave_feat_map_step)
+    
+
+
+    est_staff_lines, staff_len = QueryProcessing.estimate_staff_line_locs(featmap, notes, stave_lens, col_w, QueryProcessing.max_delta_row_initial, int(-2*QueryProcessing.target_line_sep))
+    QueryProcessing.visualize_pred_staff_lines(est_staff_lines, hlines)
+    print(f'Estimated staff length: {staff_len}')
+    return hlines, featmap, notes, stave_lens, col_w, est_staff_lines
+
+
+def test_global_staff_estimation(img_file):
+    proc = QueryProcessing(img_file)
+    det = proc.assign_detector()
+    norm = proc.get_normalized_pre_processed_image()
+
+    hlines, featmap, notes, stave_lens, col_w, est_staff_lines = test_local_staff_estimation(img_file)
+
+    # test staff midpoints clustering
+    stave_mid_pts = QueryProcessing.estimate_staff_midpoints(est_staff_lines, QueryProcessing.min_num_staves, QueryProcessing.max_num_staves, QueryProcessing.min_stave_separation)
+    QueryProcessing.visualize_staff_midpoint_clustering(est_staff_lines, stave_mid_pts)
+    stave_idxs, nh_row_offsets = QueryProcessing.assign_noteheads_to_staves(notes, stave_mid_pts)
+    QueryProcessing.visualize_clusters(norm, notes, stave_idxs)
+
+    # test refined staff lines estimation
+    est_staff_line_locs, staff_len = QueryProcessing.estimate_staff_line_locs(featmap, notes, stave_lens, col_w, 
+                                                                                 QueryProcessing.max_delta_row_refined, 
+                                                                                 (nh_row_offsets-2*QueryProcessing.target_line_sep).astype(int))
+    QueryProcessing.visualize_pred_staff_lines(est_staff_line_locs, hlines)
+    print(f'Estimated staff length: {staff_len}')
+
+    # test note labeling estimation
+    nh_vals = QueryProcessing.estimate_note_labels(est_staff_line_locs)
+    QueryProcessing.visualize_note_labels(norm, nh_vals, notes)
 
 if __name__ == "__main__":
 
@@ -113,7 +165,9 @@ if __name__ == "__main__":
 
     #test_staff_lines_detection(img_file)
     #test_notehead_detection(img_file)
-    test_barline_detection(img_file)
+    #test_barline_detection(img_file)
+    #test_local_staff_estimation(img_file)
+    test_global_staff_estimation(img_file)
 
     
     
