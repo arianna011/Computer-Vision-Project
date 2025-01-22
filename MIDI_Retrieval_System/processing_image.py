@@ -17,6 +17,7 @@ import os.path
 import multiprocessing
 from MIDI_Retrieval_System.musical_object_detection import MusicalObjectDetection
 from sklearn.cluster import KMeans
+import sys
 
 class QueryProcessing:
     """
@@ -43,8 +44,12 @@ class QueryProcessing:
     max_delta_row_refined = 15
 
     ## Bootleg Score Generation parameters
-    bootlegRepeatNotes = 2 
-    bootlegFiller = 1
+    bootleg_repeat_notes = 2 
+    bootleg_filler = 1
+    # positions of staff lines for right hand and left hand staves
+    staff_lines_RH = [7,9,11,13,15]
+    staff_lines_LH = [13,15,17,19,21]
+    staff_lines_both = [13,15,17,19,21,35,37,39,41,43]
 
     ## Alignment
     dtw_steps = [1,1,1,2,2,1] # dtw
@@ -534,7 +539,7 @@ class QueryProcessing:
         Compute information useful to cluster noteheads based on staves.
 
         Params:
-            stave_ids (list[int]): list of stave indexes
+            stave_ids (list[int]): list of stave index for each notehead
             mapping (dict[int, int]): dictionary mapping each stave index to -1 if unpaired, to itself if paired in Grouping A, to itself-1 if paired in Grouping B
         Returns:
             (list[int]): list of staff (cluster) ids
@@ -547,3 +552,152 @@ class QueryProcessing:
             cluster_pairs.append((i,i+1))
         return cluster_ids, cluster_pairs
     
+
+    ########################################## BOOTLEG SCORE GENERATION #################################################
+
+    @staticmethod
+    def collapse_simultaneous_events(notes: tuple[int, int, int, int], min_col_diff: int) -> list[tuple[list[int], list[int], list[int], list[int]]]:
+        """
+        Group together noteheads that are sufficiently close in time
+
+        Params:
+            notes (tuple[int, int, int, int]): information on noteheads including row, column, value and cluster to which it belongs
+            min_col_diff (int): threshold for collapsing simultaneous events
+
+        Returns:
+            (list[tuple[list[int], list[int], list[int], list[int]]): list of note events, each represented by a list of rows, columns, values and clusters of the component noteheads
+        """
+        assigned = np.zeros(len(notes), dtype=bool)
+        events = [] # list of simultaneous note events
+        for i, (row, col, val, cluster) in enumerate(notes):
+            if assigned[i]: # has already been assigned
+                continue
+            rows = [row] # new event
+            cols = [col]
+            vals = [val]
+            clusters = [cluster]
+            assigned[i] = True
+            for j in range(i+1, len(notes)):
+                nrow, ncol, nval, ncluster = notes[j]
+                if ncol - col < min_col_diff: # assign to same event if close
+                    rows.append(nrow)
+                    cols.append(ncol)
+                    vals.append(nval)
+                    clusters.append(ncluster)
+                    assigned[j] = True
+                else:
+                    break
+            events.append((rows, cols, vals, clusters))
+
+        assert(np.all(assigned))
+        return events
+    
+    @staticmethod
+    def get_notehead_placement(vals: list[int], clusters: list[int], r_dim: int, l_dim: int, cluster_RH: int, cluster_LH: int) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Maps notehead placements to right-hand (RH) and left-hand (LH) vectors based on clusters.
+
+        Args:
+            vals (list[int]): list of notehead positions relative to a base index (e.g., -11 to +11)
+            clusters (list[int]): list of cluster IDs corresponding to each notehead (each ID indicates left or right hand)
+            r_dim (int): dimension of the right-hand vector
+            l_dim (int): dimension of the left-hand vector
+            cluster_RH (int): Cluster ID for right-hand noteheads
+            cluster_LH (int): Cluster ID for left-hand noteheads
+
+        Returns:
+            (np.ndarray): binary vector indicating placements for right-hand noteheads
+            (np.ndarray): binary vector indicating placements for left-hand noteheads
+
+        Raises:
+            AssertionError: If `cluster_LH` is not `cluster_RH + 1`.
+            SystemExit: If an invalid cluster is encountered.
+        """
+        rhvec = np.zeros((r_dim, 1))
+        lhvec = np.zeros((l_dim, 1))
+        assert(cluster_LH == cluster_RH + 1)
+        for (val, cluster) in zip(vals, clusters):
+            if cluster == cluster_RH:
+                idx = val + 11
+                if idx >= 0 and idx < r_dim:
+                    rhvec[idx, 0] = 1
+            elif cluster == cluster_LH:
+                idx = val + 17
+                if idx >= 0 and idx < l_dim:
+                    lhvec[idx, 0] = 1
+            else:
+                print("Invalid cluster: {} (LH {}, RH {})".format(cluster, cluster_LH, cluster_RH))
+                sys.exit(1)
+        return rhvec, lhvec
+    
+    @staticmethod
+    def construct_bootleg_score(note_events: list[tuple[list[int], list[int], list[int], list[int]]], cluster_id_RH: int, cluster_id_LH: int, 
+                                repeat_notes: int = 1, filler: int = 1) -> tuple[np.ndarray, list[int], tuple[np.ndarray, list[int]], tuple[np.ndarray, list[int]]]:
+        """
+        Group note events into a matrix of right and left hand note placements for each event
+
+        Params:
+            note_events (list[tuple[list[int], list[int], list[int], list[int]]]): list of note events, 
+                                                                                  each represented by a list of rows, columns, values and clusters of the component noteheads
+            cluster_id_RH (int): id of the cluster for the right hand
+            cluster_id_LH (int): id of the cluster for the left hand
+            repeat_notes (int): how many times to repeat each note event
+            filler (int): how many filler colummns to insert between note events
+
+        Returns:
+            (np.ndarray): 2D array with note placements on right and left hand staves (dim: (lh_dim + rh_dim) x number of note events)
+            (list[int]): list of event indexes to indicate which event each filler column is related to
+            (tuple[np.ndarray, list[int]]): note placements for right hand and right hand staff lines
+            (tuple[np.ndarray, list[int]]): note placements for left hand and right left staff lines
+        
+        """
+       
+        rh_dim = 34 # E3 to C8 (inclusive)
+        lh_dim = 28 # A1 to G4 (inclusive)
+        rh = [] # list of arrays of size rh_dim
+        lh = [] # list of arrays of size lh_dim
+        event_idxs = [] # index of corresponding simultaneous note event
+        for i, (rows, cols, vals, clusters) in enumerate(note_events):
+
+            # insert empty filler columns between note events
+            if i > 0:
+                for _ in range(filler):
+                    rh.append(np.zeros((rh_dim,1)))
+                    lh.append(np.zeros((lh_dim,1)))
+                    event_idxs.append(i-1) # assign filler to previous event
+
+            # insert note events columns
+            rhvec, lhvec = QueryProcessing.get_notehead_placement(vals, clusters, rh_dim, lh_dim, cluster_id_RH, cluster_id_LH)
+            for _ in range(repeat_notes):
+                rh.append(rhvec)
+                lh.append(lhvec)
+                event_idxs.append(i)
+        rh = np.squeeze(np.array(rh)).reshape((-1, rh_dim)).T # reshape handles case when len(rh) == 1
+        lh = np.squeeze(np.array(lh)).reshape((-1, lh_dim)).T
+        both = np.vstack((lh, rh))
+        return both, event_idxs, (rh, QueryProcessing.staff_lines_RH), (lh, QueryProcessing.staff_lines_LH)
+
+    @staticmethod
+    def generate_single_bootleg_line(notes_data: tuple[int, int, int, int], cluster_R: int, cluster_L: int, 
+                                     min_col_diff: int, repeat_notes: int = 1, filler: int = 1) -> tuple[np.ndarray, list[tuple[list[int], list[int], list[int], list[int]]], list[int]]:
+        """
+        Generate the bootleg score corresponding to a single line of sheet music (including both left and right hand staves)
+
+        Params:
+            notes_data (tuple[int, int, int, int]): information on noteheads including row, column, value and cluster to which it belongs
+            cluster_R (int): id of the cluster for the right hand
+            cluster_L (int): id of the cluster for the left hand
+            min_col_diff (int): threshold for collapsing simultaneous events
+            repeat_notes (int): how many times to repeat each note event
+            filler (int): how many filler colummns to insert between note events
+
+        Returns:
+            (np.ndarray): the bootleg score line
+            (list[tuple[list[int], list[int], list[int], list[int]]): list of note events, each represented by a list of rows, columns, values and clusters of the component noteheads
+            (list[int]): list of event indexes to indicate which event each filler column is related to
+        """
+        notes = [tup for tup in notes_data if tup[3] == cluster_R or tup[3] == cluster_L]
+        notes = sorted(notes, key = lambda tup: (tup[1], tup[0])) # sort by column, then row
+        collapsed = QueryProcessing.collapse_simultaneous_events(notes, min_col_diff) # list of (rows, cols, vals, clusters)
+        bscore, event_idxs, _, _ = QueryProcessing.construct_bootleg_score(collapsed, cluster_R, cluster_L, repeat_notes, filler)
+        return bscore, collapsed, event_idxs
