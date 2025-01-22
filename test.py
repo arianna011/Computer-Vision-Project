@@ -1,5 +1,6 @@
 from MIDI_Retrieval_System import BootlegScore, MIDIProcessing, QueryProcessing, MusicalObjectDetection
 import matplotlib.pyplot as plt
+import numpy as np
 
 def test_bootleg_score(midi_file):
     # visualize bootleg score
@@ -155,6 +156,27 @@ def test_global_staff_estimation(img_file):
     # test note labeling estimation
     nh_vals = QueryProcessing.estimate_note_labels(est_staff_line_locs)
     QueryProcessing.visualize_note_labels(norm, nh_vals, notes)
+    return notes, stave_idxs, stave_mid_pts
+
+def test_stave_grouping(img_file):
+    proc = QueryProcessing(img_file)
+    det = proc.assign_detector()
+    norm = proc.get_normalized_pre_processed_image()
+
+    # compute bar line features
+    vlines = det.isolate_bar_lines(MusicalObjectDetection.morph_filter_bar_vert, MusicalObjectDetection.morph_filter_bar_hor, MusicalObjectDetection.max_barline_width)
+    # compute staff midpoints
+    notes, stave_ids, mid_pts = test_global_staff_estimation(img_file)
+    stave_map, evidence = QueryProcessing.determine_stave_grouping(mid_pts, vlines)
+    print(stave_map)
+    plt.plot(np.sum(vlines, axis=1))
+    for m in mid_pts:
+        plt.axvline(m, color = 'r')
+    plt.show()
+    clusters, clusters_pairs = QueryProcessing.cluster_noteheads(stave_ids, stave_map)
+    QueryProcessing.visualize_clusters(norm, notes, clusters)
+ 
+
 
 if __name__ == "__main__":
 
@@ -167,7 +189,8 @@ if __name__ == "__main__":
     #test_notehead_detection(img_file)
     #test_barline_detection(img_file)
     #test_local_staff_estimation(img_file)
-    test_global_staff_estimation(img_file)
+    #test_global_staff_estimation(img_file)
+    test_stave_grouping(img_file)
 
     
     

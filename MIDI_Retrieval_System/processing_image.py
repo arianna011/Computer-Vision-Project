@@ -458,6 +458,92 @@ class QueryProcessing:
         plt.ylabel("Row Position")
         plt.title("Annotated Noteheads")
         plt.show()
-    
 
+    @staticmethod
+    def determine_stave_grouping(stave_mid_pts: np.ndarray, 
+                                 bar_lines: np.ndarray) -> tuple[dict[int, int], tuple[float, float, list[float], list[float]]]:
+        """
+        Group the staves into right-hand/left-hand pairs, based on staves midpoints and bar line features:
+        the right hand and left hand staves are connected by bar lines.
+
+        This function attempts to group staves into two configurations (A and B):
+        - Grouping A: Pairs consecutive staves (0-1, 2-3, 4-5, ...).
+        - Grouping B: Pairs alternate staves starting from index 1 (1-2, 3-4, 5-6, ...).
+
+        It evaluates the two groupings based on the median sum of bar line features
+        within the respective groups and selects the grouping with higher "evidence".
+
+        Params:
+            stave_mid_pts (np.ndarray): array of midpoints representing the center of stave positions
+            bar_lines (np.ndarray): 2D array where each row corresponds to features of bar lines for a stave row.
+
+        Returns:
+            dict[int, int]: dictionary mapping each stave index to -1 if unpaired, to itself if paired in Grouping A, to itself-1 if paired in Grouping B
+            (float) evidence (median of row sums of bar line features) for Grouping A
+            (float) evidence for Grouping B,
+            (list[float]) bar line feature sums for elements in Grouping A
+            (list[float]) bar line feature sums for elements in Grouping B
+        """
+        N = len(stave_mid_pts) # number of staves
+        row_sums = np.sum(bar_lines, axis=1) # sum of bar lines (vertical lines) features for each row
+
+        # grouping A: 0-1, 2-3, 4-5, ...
+        elems_A = []
+        map_A = {}
+        for stave_idx in np.arange(0, N, 2):
+            if stave_idx+1 < N:
+                row_start = int(stave_mid_pts[stave_idx])       # consider a vertical region around the stave pairing
+                row_end = int(stave_mid_pts[stave_idx+1]) + 1
+                elems_A.extend(row_sums[row_start:row_end])
+                map_A[stave_idx] = stave_idx
+                map_A[stave_idx+1] = stave_idx + 1
+            else:
+                map_A[stave_idx] = -1 # unpaired stave
+
+        # grouping B: 1-2, 3-4, 5-6, ...
+        elems_B = []
+        map_B = {}
+        map_B[0] = -1
+        for stave_idx in np.arange(1, N, 2):
+            if stave_idx+1 < N:
+                row_start = int(stave_mid_pts[stave_idx])
+                row_end = int(stave_mid_pts[stave_idx+1]) + 1
+                elems_B.extend(row_sums[row_start:row_end])
+                map_B[stave_idx] = stave_idx - 1
+                map_B[stave_idx + 1] = stave_idx
+            else:
+                map_B[stave_idx] = -1
+
+        if N > 2:
+            evidence_A = np.median(elems_A)
+            evidence_B = np.median(elems_B)
+            if evidence_A > evidence_B:
+                mapping = map_A
+            else:
+                mapping = map_B
+        else:
+            evidence_A = np.median(elems_A)
+            evidence_B = 0
+            mapping = map_A
+
+        return mapping, (evidence_A, evidence_B, elems_A, elems_B)
+    
+    @staticmethod
+    def cluster_noteheads(stave_ids: list[int], mapping: dict[int, int]) -> tuple[list[int], list[tuple[int,int]]]:
+        """
+        Compute information useful to cluster noteheads based on staves.
+
+        Params:
+            stave_ids (list[int]): list of stave indexes
+            mapping (dict[int, int]): dictionary mapping each stave index to -1 if unpaired, to itself if paired in Grouping A, to itself-1 if paired in Grouping B
+        Returns:
+            (list[int]): list of staff (cluster) ids
+            (list[tuple[int,int]]): list of staves (clusters) pairings
+        """
+        cluster_ids = [mapping[stave_idx] for stave_idx in stave_ids]
+        max_cluster_idx = np.max(np.array(cluster_ids))
+        cluster_pairs = []
+        for i in range(0, max_cluster_idx, 2):
+            cluster_pairs.append((i,i+1))
+        return cluster_ids, cluster_pairs
     
