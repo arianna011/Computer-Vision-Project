@@ -24,8 +24,8 @@ class MusicalObjectDetection:
     # Notehead Detection
     morph_filter_circ_dilate = 5
     morph_filter_circ_erode = 5
-    note_detect_min_area = 50.0
-    note_detect_max_area = 200.0
+    note_detect_min_area = 50
+    note_detect_max_area = 200
     note_template_size = 21
     note_detect_tol_ratio = .4
 
@@ -54,6 +54,10 @@ class MusicalObjectDetection:
         self.qproc = qproc
         self.img = img
         self.norm_img = norm_img
+
+        self.isol_staff_lines = None 
+        self.notes_bboxes = []
+        self.isol_bar_lines = None
 
     @staticmethod
     def morph_filter_rectangle(img: np.ndarray , kernel_h: int, kernel_w: int) -> np.ndarray:
@@ -117,6 +121,8 @@ class MusicalObjectDetection:
         lines = self.morph_filter_rectangle(img = self.norm_img, kernel_h = 1, kernel_w = kernel_len) # isolate horizontal lines
         notebars_only = self.morph_filter_rectangle(img = lines, kernel_h = notbar_filter_len, kernel_w = 1) # isolate thick notebars
         result = np.clip(lines - notebar_removal * notebars_only, 0, None) # subtract out notebars and clip to ensure there are no negative values
+
+        self.isol_staff_lines = result
         
         return result
     
@@ -145,8 +151,8 @@ class MusicalObjectDetection:
                 combfilt[idx_above] = remainder
         return combfilt, stavelen
     
-    @staticmethod
-    def compute_staff_feature_map(img, n_cols, lower_bound, upper_bound, step):
+
+    def compute_staff_feature_map(self, n_cols, lower_bound, upper_bound, step):
         """
         Compute the feature map of the musical staff in a cellphone image (needed since lines could be not perfectly straight in the image)
         by dividing the input image into a fixed number of columns,
@@ -154,7 +160,6 @@ class MusicalObjectDetection:
         that represent multiple possibile spacings between adjacent staff lines
 
         Params:
-            img (np.ndarray): input image containing isolated staff lines
             n_cols (int): number of columns to divide the image into
             lower_bound (float): lower bound in the range of candidate spacings between staff lines
             upper_bound (float): upper bound in the range of candidate spacings between staff lines
@@ -167,13 +172,13 @@ class MusicalObjectDetection:
         """
 
         # break image into columns, calculate row medians for each column
-        img_h, img_w = img.shape
+        img_h, img_w = self.isol_staff_lines.shape
         row_sums = np.zeros((img_h, n_cols))
         col_w = int(np.ceil(img_w/n_cols))
         for i in range(n_cols):
             start_col = i * col_w
             end_col = min((i+1)*col_w, img_w)
-            row_sums[:,i] = np.sum(img[:,start_col:end_col], axis=1) # ? here it actually computes row sums
+            row_sums[:,i] = np.sum(self.isol_staff_lines[:,start_col:end_col], axis=1) # ? here it actually computes row sums
         
         # apply comb filters
         line_seps = np.arange(lower_bound, upper_bound, step) # candidate values for staff lines separation
@@ -260,7 +265,7 @@ class MusicalObjectDetection:
 
     def get_note_template(self, keypoints: list[cv2.KeyPoint], sz: int) -> tuple[np.ndarray, int]:
         """
-        Compute an estimate (template) of how a notehead looks like in the eroded and dilated normalized pre-processed image
+        Compute an estimate (template) of how a notehead looks like in the normalized eroded and dilated pre-processed image
         by taking the average of cropped regions around detected noteheads
 
         Params:
@@ -277,17 +282,17 @@ class MusicalObjectDetection:
 
         template = np.zeros((sz,sz))
         L = (sz - 1)//2 # used to define a crop region
-        numCrops = 0
+        num_crops = 0
         for k in keypoints:
             xloc = int(np.round(k.pt[0])) # col
             yloc = int(np.round(k.pt[1])) # row
             if xloc - L >= 0 and xloc + L + 1 <= img.shape[1] and yloc - L >= 0 and yloc + L + 1 <= img.shape[0]:
                 crop = img[yloc-L:yloc+L+1,xloc-L:xloc+L+1]
                 template += crop
-                numCrops += 1
-        if numCrops > 0:
-            template = template / numCrops
-        return template, numCrops
+                num_crops += 1
+        if num_crops > 0:
+            template = template / num_crops
+        return template, num_crops
 
     @staticmethod
     def binarize_otsu(img: np.ndarray) -> tuple[np.ndarray, float]:
@@ -446,17 +451,13 @@ class MusicalObjectDetection:
             elif MusicalObjectDetection.is_valid_chord_block(region, chord_block_specs, template_specs):
                 chord_notes = MusicalObjectDetection.extract_notes_from_chord_block(region, template_specs)
                 notes.extend(chord_notes)
+        self.notes_bboxes = notes
         return notes, binarized
     
-    @staticmethod
-    def get_notehead_info(bboxes: list[tuple[int,int,int,int]]) -> tuple[list[tuple[float, float]], int, int]:
+    def get_notehead_info(self) -> tuple[list[tuple[float, float]], int, int]:
         """
         Compute information about the noteheads bounding boxes: 
         the center coordinates (row, column) of each notehead and the estimated average length and width of noteheads
-
-        Params:
-            bboxes (list[tuple[int,int,int,int]]): list of bounding boxes of single noteheads 
-                                                   (each bounding box contains row minimum, column minimum, row maximum, column maximum)
 
         Returns:
             (list[tuple[float, float]]): a list of center coordinates of each notehead
@@ -464,9 +465,9 @@ class MusicalObjectDetection:
             (int): rounded estimated average width of noteheads
                               
         """
-        center_coords = [(.5*(bbox[0] + bbox[2]), .5*(bbox[1] + bbox[3])) for bbox in bboxes]
-        heights = [(bbox[2] - bbox[0]) for bbox in bboxes]
-        widths = [(bbox[3] - bbox[1]) for bbox in bboxes]
+        center_coords = [(.5*(bbox[0] + bbox[2]), .5*(bbox[1] + bbox[3])) for bbox in self.notes_bboxes]
+        heights = [(bbox[2] - bbox[0]) for bbox in self.notes_bboxes]
+        widths = [(bbox[3] - bbox[1]) for bbox in self.notes_bboxes]
         mean_heights = int(np.ceil(np.mean(heights)))
         mean_widths = int(np.ceil(np.mean(widths)))
         return center_coords, mean_heights, mean_widths
@@ -494,4 +495,5 @@ class MusicalObjectDetection:
         vlines = self.morph_filter_rectangle(vlines, vert_filter, 1) # then filter for tall vertical lines
         nonbarlines = self.morph_filter_rectangle(vlines, 1, max_barline_width) # extract elements that are too thick to be barlines
         vlines = np.clip(vlines - nonbarlines, 0, 1)
+        self.isol_bar_lines = vlines
         return vlines

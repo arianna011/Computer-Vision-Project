@@ -1,20 +1,8 @@
 import numpy as np
-from numpy.matlib import repmat
 import matplotlib.pyplot as plt
 from PIL import Image, ImageFilter, ImageChops
-import cv2
 import matplotlib.patches as mpatches
 from scipy.signal import convolve2d
-from scipy.spatial import KDTree
-import seaborn as sns
-import pickle
-import librosa as lb
-import time
-import cProfile
-import os
-import os.path
-#import pyximport; pyximport.install()
-import multiprocessing
 from MIDI_Retrieval_System.musical_object_detection import MusicalObjectDetection
 from sklearn.cluster import KMeans
 import sys
@@ -65,11 +53,13 @@ class QueryProcessing:
 
         # convert the image to grayscale via the PIL library 
         self.gray_img = self.img.convert('L') # 'L' stands for 'luminance'
-        self.pre_processed_image = None
+
+        self.img_no_backgrd_noise = None
+        self.pre_processed_img = None
+        self.norm_inv_img = None
 
         # link to an object that takes care of detecting musical elements on sheet music
         self.object_detector = None
-
     
     def assign_detector(self) -> MusicalObjectDetection:
         """
@@ -78,10 +68,18 @@ class QueryProcessing:
         Returns:
             (MusicalObjectDetection): the created detector
         """
-        det = MusicalObjectDetection(self, self.pre_process_image(), self.get_normalized_pre_processed_image())
+        det = MusicalObjectDetection(self, self.pre_process_image(), self.normalize_pre_processed_image())
         self.object_detector = det
         return det
     
+    @staticmethod
+    def display_img(img: Image.Image, cmap: str = 'gray'):
+        """
+        Display on screen a PIL image with the specified colormap
+        """
+        plt.imshow(img, cmap=cmap)
+        plt.axis('off')
+        plt.show()
     
     @staticmethod
     def normalize_and_invert_image(img) -> np.ndarray:
@@ -91,11 +89,10 @@ class QueryProcessing:
         Returns:
             (np.array): normalized and inverted image
         """
-        return 1 - np.array(img) / 255.0
-    
+        return 1 - np.array(img) / 255.0 
 
     @staticmethod
-    def show_grayscale_image(img, fig_size = (10, 10), max_val = 1, inverted = True):
+    def show_grayscale_image(img: np.ndarray, fig_size: tuple[int, int] = (10, 10), max_val: int = 1, inverted: bool = True):
         """
         Show a gray scale image on screen.
 
@@ -112,7 +109,6 @@ class QueryProcessing:
             plt.imshow(img, cmap = 'gray')
         plt.show()
 
-
     @staticmethod
     def show_color_image(img, fig_size = (10, 10)):
         """
@@ -125,7 +121,6 @@ class QueryProcessing:
         plt.figure(figsize=fig_size)
         plt.imshow(img)
         plt.show()
-
     
     @staticmethod
     def show_img_with_bound_boxes(img, bboxes, fig_size = (10,10)):
@@ -148,17 +143,18 @@ class QueryProcessing:
         plt.tight_layout()
         plt.show()
 
-
-    def get_normalized_pre_processed_image(self) -> np.ndarray:
+    def normalize_pre_processed_image(self) -> np.ndarray:
         """
+        Normalize and invert the pre-processed image
+
         Returns:
             (np.ndarray) the pre-processed image normalized to be a binary image
         """
-        if not self.pre_processed_image: self.pre_process_image()
-        return QueryProcessing.normalize_and_invert_image(self.pre_processed_image)            
+        if not self.pre_processed_img: self.pre_process_image()
+        self.norm_inv_img = QueryProcessing.normalize_and_invert_image(self.pre_processed_img)
+        return self.norm_inv_img       
 
-
-    def pre_process_image(self) -> np.ndarray:
+    def pre_process_image(self, verbose: bool = False) -> np.ndarray:
         """
         Pre-process a picture of sheet music by removing noise caused by background lightning conditions 
         and resizing the image in order to have the desired amount of pixels in the spacing between adjacent staff lines
@@ -166,16 +162,25 @@ class QueryProcessing:
         Returns:
             (np.ndarray) the pre-processed image
         """
+
+        if self.pre_processed_img:
+            return self.pre_processed_img
+
         # remove background lightning to reduce noise
-        self.pre_processed_image = self.remove_background_lightning()
+        self.img_no_backgrd_noise = self.remove_background_lightning()
         # normalize the spacing between staff lines by resizing the image
         estimated_line_sep, _ = self.estimate_line_sep(QueryProcessing.est_line_sep_n_cols, 
                                                     QueryProcessing.est_line_sep_lower_bound, 
                                                     QueryProcessing.est_line_sep_upper_bound, 
                                                     QueryProcessing.est_line_sep_step)
         target_h, target_w = self.calculate_resized_dimensions(estimated_line_sep, QueryProcessing.target_line_sep)
-        self.pre_processed_image = self.pre_processed_image.resize((target_w, target_h))
-        return self.pre_processed_image
+        self.pre_processed_img = self.img_no_backgrd_noise.resize((target_w, target_h))
+
+        if verbose:
+            print(f'Target Height: {target_h}, Target Width: {target_w}')
+            print(f'Original Height: {self.gray_img.height}, Original Width: {self.gray_img.width}')
+
+        return self.pre_processed_img
 
 
     def remove_background_lightning(self, filt_sz: int = thumbnail_filter_size, thumbnail_w: int = thumbnail_w, thumbnail_h: int = thumbnail_h) -> Image.Image:
@@ -215,14 +220,26 @@ class QueryProcessing:
         return filter
     
 
-    def estimate_line_sep(self, n_cols, low_bound, up_bound, step) -> tuple[int, np.ndarray]:
+    def estimate_line_sep(self, n_cols: int, low_bound: int, up_bound: int, step: int) -> tuple[int, np.ndarray]:
         """
         Estimate the spacing between staff lines by using multiple filters for different candidate spacings
         and considering the one that gives the highest response
+
+        Params:
+            n_cols (int): the number of columns to divide the img into
+            low_bound (int): lower bound for the line separation values to try
+            up_bound (int): upper bound for the line separation values to try
+            step (int): step for the line separation values to try
+        
+        Returns:
+            (int) the line separation value with the highest score
+            (np.ndarray) the scores for all line separation values
         """
     
         # break image into columns, calculate row medians for inner columns (exclude outermost columns)
-        img = 255 - np.array(self.gray_img) # invert colors so that staff lines become bright
+        if not self.img_no_backgrd_noise:
+            self.img_no_backgrd_noise = self.remove_background_lightning()
+        img = 255 - np.array(self.img_no_backgrd_noise) # invert colors so that staff lines become bright
         img_h, img_w = img.shape
         row_medians = np.zeros((img_h, n_cols))
         col_w = img_w // (n_cols + 2)
@@ -249,7 +266,9 @@ class QueryProcessing:
         """
         Get the dimensions of the image resized to have the spacing between adjacent staff lines equal to the desired quantity
         """
-        cur_h, cur_w = self.gray_img.height, self.gray_img.width
+        if not self.img_no_backgrd_noise:
+            self.img_no_backgrd_noise = self.remove_background_lightning()
+        cur_h, cur_w = self.img_no_backgrd_noise.height, self.img_no_backgrd_noise.width
         scale_factor = 1.0 * desired_line_sep / estimated_line_sep
         target_h = int(cur_h * scale_factor)
         target_w = int(cur_w * scale_factor)
@@ -364,11 +383,11 @@ class QueryProcessing:
         r = np.array([.5*(tup[0] + tup[1]) for tup in preds]) # midpts of estimated stave locations
         y_values = np.random.uniform(low=0.4, high=0.6, size=len(r))
         plt.plot(r, y_values, '.', label='Predicted Midpoints')
+        for center in centers:
+            plt.axvline(x=center, color='r')
         plt.xlabel("Estimated Staff Line Midpoints")
         plt.ylabel("Random Spread (for visualization)")
         plt.title("Staff Line Midpoint Clustering")
-        for center in centers:
-            plt.axvline(x=center, color='r', label='Cluster center')
         plt.legend()
         plt.show()
 
@@ -378,8 +397,7 @@ class QueryProcessing:
         Assign noteheads to the nearest staff based on the vertical distance between their row locations and the centers of the staves
 
         Params:
-            nh_locs (list[tuple[int,int,int,int]]): list of bounding boxes of single noteheads 
-                                                    (each bounding box contains row minimum, column minimum, row maximum, column maximum)
+            nh_locs (list[tuple[int,int]]): list of center coordinates (row, col) of single noteheads 
             stave_centers (np.ndarray): a 1D array of vertical positions representing the centers of the staves
 
         Returns:
@@ -401,8 +419,7 @@ class QueryProcessing:
 
         Params:
             img (np.ndarray): input grayscale image where noteheads are located
-            nh_locs (list[tuple[int,int,int,int]]): list of bounding boxes of single noteheads 
-                                                    (each bounding box contains row minimum, column minimum, row maximum, column maximum)
+            nh_locs (list[tuple[int,int]]): list of center coordinates (row, col) of single noteheads 
             clusters(np.ndarray): array of indices indicating which staff each notehead is closest to
             fig_sz (tuple[int, int]): figure size
         """
@@ -448,8 +465,7 @@ class QueryProcessing:
         Params:
             img (np.ndarray): grayscale image to display
             vals (list[int]): list of note labels corresponding to the noteheads' positions
-            nh_locs (list[tuple[int,int,int,int]]): list of bounding boxes of single noteheads 
-                                                    (each bounding box contains row minimum, column minimum, row maximum, column maximum)
+            nh_locs (list[tuple[int,int]]): list of center coordinates (row, col) of single noteheads 
             fig_sz (tuple[int, int]): size of the figure to display
         """
         plt.figure(figsize=fig_sz)
@@ -693,7 +709,7 @@ class QueryProcessing:
 
         Returns:
             (np.ndarray): the bootleg score line
-            (list[tuple[list[int], list[int], list[int], list[int]]): list of note events, each represented by a list of rows, columns, values and clusters of the component noteheads
+            (list[tuple[list[int], list[int], list[int], list[int]]]): list of note events, each represented by a list of rows, columns, values and clusters of the component noteheads
             (list[int]): list of event indexes to indicate which event each filler column is related to
         """
         notes = [tup for tup in notes_data if tup[3] == cluster_R or tup[3] == cluster_L]
@@ -701,3 +717,74 @@ class QueryProcessing:
         collapsed = QueryProcessing.collapse_simultaneous_events(notes, min_col_diff) # list of (rows, cols, vals, clusters)
         bscore, event_idxs, _, _ = QueryProcessing.construct_bootleg_score(collapsed, cluster_R, cluster_L, repeat_notes, filler)
         return bscore, collapsed, event_idxs
+    
+    @staticmethod
+    def visualize_bootleg_score(bs: np.ndarray, lines: list[int], fig_sz: tuple[int, int] = (10,10)):
+        """
+        Visualize on screen a bootleg score with staff lines.
+
+        Params:
+            bs (np.ndarray): the bootleg score to visualize
+            lines (list[int]): the positions of staff lines for both left and right hands
+            fig_sz (tuple[int, int]): the size of the figure to show
+        """
+        plt.figure(figsize = fig_sz)
+        plt.imshow(1 - bs, cmap = 'gray', origin = 'lower')
+        for l in range(1, bs.shape[0], 2):
+            plt.axhline(l, c = 'grey')
+        for l in lines:
+            plt.axhline(l, c = 'r')
+        plt.show()
+    
+    @staticmethod
+    def generate_query_bootleg_score(notes_data: tuple[int, int, int, int], pairings: list[tuple[int,int]], 
+                                     min_col_diff: int = 10, repeat_notes: int = 1, 
+                                     filler: int = 1) -> tuple[np.ndarray, list[tuple[list[int], list[int], list[int], list[int]]], list[int]]:
+        """
+        Generate the complete bootleg score of the query by its extracted notes and stave clusters information.
+
+        Params:
+            notes_data (tuple[int, int, int, int]): information on noteheads including row, column, value and cluster to which it belongs
+            pairings (list[tuple[int,int]]): list of staves (clusters) pairings
+            min_col_diff (int): threshold for collapsing simultaneous events
+            repeat_notes (int): how many times to repeat each note event
+            filler (int): how many filler colummns to insert between note events
+
+        Returns:
+            (np.ndarray): bootleg score resulting from the horizontal concatenation of single bootleg lines
+            (list[tuple[list[int], list[int], list[int], list[int]]]): list of all note events, each represented by a list of rows, columns, values and clusters of the component noteheads
+            (list[int]): list of event indexes to indicate which event each filler column is related to
+
+        """
+        all_scores = []
+        all_events = []
+        glob_idxs = []
+        event_count = 0
+        for i, (cluster_R, cluster_L) in enumerate(pairings):
+            score, events, event_idxs = QueryProcessing.generate_single_bootleg_line(notes_data, cluster_R, cluster_L, min_col_diff, repeat_notes, filler)
+            all_scores.append(score)
+            all_events.extend(events)
+            glob_idxs.extend([idx + event_count for idx in event_idxs])
+            if i < len(pairings) - 1:
+                all_scores.append(np.zeros((score.shape[0], filler))) # append filler columns between bootleg scores
+                glob_idxs.extend([glob_idxs[-1]] * filler) # map filler columns to last event index
+            event_count += len(events)
+        panorama = np.hstack(all_scores)
+        return panorama, all_events, glob_idxs
+    
+    @staticmethod
+    def visualize_long_bootleg_score(bs: np.ndarray, lines: list[int], chunk_sz: int = 150):
+        """
+        Visualize on screen a bootleg score which is long in the horizontal dimension
+        by dividing it in chunks and showing one at a time
+
+        Params:
+            bs (np.ndarray): bootleg score to visualize
+            lines (list[int]): staff lines positions
+            chunk_sz (int): size of each chunk
+        """
+        chunks = bs.shape[1] // chunk_sz + 1
+        for i in range(chunks):
+            start_col = i * chunk_sz
+            end_col = min((i + 1)*chunk_sz, bs.shape[1])
+            QueryProcessing.visualize_bootleg_score(bs[:,start_col:end_col], lines)
