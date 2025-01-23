@@ -1,6 +1,7 @@
 from MIDI_Retrieval_System import BootlegScore, MIDIProcessing, QueryProcessing, MusicalObjectDetection
 import matplotlib.pyplot as plt
 import numpy as np
+import cv2
 
 def test_bootleg_score(midi_file):
     # visualize bootleg score
@@ -16,167 +17,101 @@ def test_midi_processing():
     outdir = 'experiments/train/db' # where to save bootleg scores
     MIDIProcessing.process_midi_batch(fileList, outdir)
 
-def test_query_pre_processing(img_file):
-    # visualize picture pre-processing step-by-step
-    q_proc = QueryProcessing(img_file)
-    new_img = q_proc.remove_background_lightning()
-    plt.imshow(q_proc.img)
-    plt.show()
-    plt.imshow(new_img)
-    plt.show()
-    line_sep, scores = q_proc.estimate_line_sep(QueryProcessing.est_line_sep_n_cols, QueryProcessing.est_line_sep_lower_bound, QueryProcessing.est_line_sep_upper_bound, QueryProcessing.est_line_sep_step)
-    print(f'Estimated line sep: {line_sep}')
-    h, w = q_proc.calculate_resized_dimensions(line_sep, QueryProcessing.target_line_sep)
-    print(f'Target dims: {h} x {w}')
-    resized_img = new_img.resize((w,h))
-    plt.imshow(resized_img)
-    plt.show()
-    print(f'Picture dims: {resized_img.height} x {resized_img.width}')
 
-def test_query_pre_processing_one_step(img_file):
-    # test the function that does all query pre-processing by itself
-    q_proc = QueryProcessing(img_file)
-    q_proc.pre_process_image()
-    img = q_proc.pre_processed_image
-    plt.imshow(img)
-    plt.show()
-    print(f'Picture dims: {img.height} x {img.width}')
+def test_all_query_bootleg_generation(img_file, verbose=True):
 
-
-###########  TEST MUSICAL OBJECT DETECTION ####################
-
-def test_staff_lines_detection(img_file):
-    proc = QueryProcessing(img_file)
-    det = proc.assign_detector()
-    res = det.isolate_staff_lines(MusicalObjectDetection.morph_filter_rect_len, 
-                                  MusicalObjectDetection.notebar_filter_len, 
-                                  MusicalObjectDetection.notebar_removal)
-    proc.show_grayscale_image(res)
-
-    # Compute the staff feature map
-    featmap, stave_lens, col_w = MusicalObjectDetection.compute_staff_feature_map(res, 
-                                                               MusicalObjectDetection.stave_feat_map_n_cols, 
-                                                               MusicalObjectDetection.stave_feat_map_lower_bound, 
-                                                               MusicalObjectDetection.stave_feat_map_upper_bound, 
-                                                               MusicalObjectDetection.stave_feat_map_step)
-    # Display the results
-    print("Feature Map Shape:", featmap.shape)
-    print("Stave Lengths:", stave_lens)
-    print("Column Width:", col_w)
-    proc.show_grayscale_image(featmap[0])
-
-
-def test_notehead_detection(img_file):
-
+    # PRE-PROCESSING
     proc = QueryProcessing(img_file)
     det = proc.assign_detector()
 
-    # test erosion and dilation
-    res = MusicalObjectDetection.morph_filter_circle(det.img, MusicalObjectDetection.morph_filter_circ_dilate, MusicalObjectDetection.morph_filter_circ_erode)
-    proc.show_grayscale_image(res, max_val=255, inverted=False)
+    proc.normalize_pre_processed_image()
+    if verbose: QueryProcessing.show_grayscale_image(proc.norm_inv_img)
 
-    # test blob detector
+    # isolate staff lines
+    det.isolate_staff_lines(MusicalObjectDetection.morph_filter_rect_len, 
+                            MusicalObjectDetection.notebar_filter_len, 
+                            MusicalObjectDetection.notebar_removal)
+    hlines = det.isol_staff_lines
+    if verbose: QueryProcessing.show_grayscale_image(hlines)
+
+    # compute staff features
+    staff_featmap, stave_lens, col_w = det.compute_staff_feature_map(MusicalObjectDetection.stave_feat_map_n_cols, 
+                                                                     MusicalObjectDetection.stave_feat_map_lower_bound, 
+                                                                     MusicalObjectDetection.stave_feat_map_upper_bound, 
+                                                                     MusicalObjectDetection.stave_feat_map_step)
+    if verbose:
+        print("Feature Map Shape:", staff_featmap.shape)
+        print("Stave Lengths:", stave_lens)
+        print("Column Width:", col_w)
+    
+    # NOTEHEAD DETECTION
     keypoints, img_with_keypoints = det.detect_notehead_blobs(min_area=MusicalObjectDetection.note_detect_min_area, 
                                                               max_area = MusicalObjectDetection.note_detect_max_area)
-    proc.show_color_image(img_with_keypoints)
+    if verbose: proc.show_color_image(img_with_keypoints)
 
-    # test notehead template computing
     note_template, n_crops = det.get_note_template(keypoints, MusicalObjectDetection.note_template_size)
-    print(f'Number of crops: {n_crops}')
-    proc.show_grayscale_image(note_template, (3,3))
+    if verbose:
+        print(f'Number of crops: {n_crops}')
+        proc.show_grayscale_image(note_template, (3,3))
 
-    # test adaptive notehead detection
-    notes, img_bin_notes = det.adaptive_notehead_detect(note_template, MusicalObjectDetection.note_detect_tol_ratio, MusicalObjectDetection.chord_specs)
-    proc.show_img_with_bound_boxes(img_bin_notes, notes)
+    _, img_bin_notes = det.adaptive_notehead_detect(note_template, MusicalObjectDetection.note_detect_tol_ratio, MusicalObjectDetection.chord_specs)
+    if verbose: proc.show_img_with_bound_boxes(img_bin_notes, det.notes_bboxes)
 
-    coords, h_mean, w_mean = MusicalObjectDetection.get_notehead_info(notes)
-    print("Center coordinates: ", coords)
-    print("Average height: ", h_mean)
-    print("Average width: ", w_mean)
+    note_centers, h_mean, w_mean = det.get_notehead_info()
+    if verbose:
+        print("Average height: ", h_mean)
+        print("Average width: ", w_mean)
 
+    # INFER NOTES VALUES
 
-def test_barline_detection(img_file):
-    proc = QueryProcessing(img_file)
-    det = proc.assign_detector()
-    vlines = det.isolate_bar_lines(MusicalObjectDetection.morph_filter_bar_vert, MusicalObjectDetection.morph_filter_bar_hor, MusicalObjectDetection.max_barline_width)
-    proc.show_grayscale_image(vlines)
+    # local staff estimation
+    est_staff_lines, staff_len = QueryProcessing.estimate_staff_line_locs(staff_featmap, note_centers, stave_lens, col_w, QueryProcessing.max_delta_row_initial, int(-2*QueryProcessing.target_line_sep))
+    if verbose:
+        QueryProcessing.visualize_pred_staff_lines(est_staff_lines, hlines)
+        print(f'Estimated staff length: {staff_len}')
 
-
-##################### TEST QUERY BOOTLEG PROJECTION ##########################
-
-def test_local_staff_estimation(img_file):
-    proc = QueryProcessing(img_file)
-    det = proc.assign_detector()
-    hlines = det.isolate_staff_lines(MusicalObjectDetection.morph_filter_rect_len, 
-                                  MusicalObjectDetection.notebar_filter_len, 
-                                  MusicalObjectDetection.notebar_removal)
-    # Detect noteheads
-    hlines = MusicalObjectDetection.morph_filter_circle(det.img, MusicalObjectDetection.morph_filter_circ_dilate, MusicalObjectDetection.morph_filter_circ_erode)
-    keypoints, _ = det.detect_notehead_blobs(min_area=MusicalObjectDetection.note_detect_min_area, max_area = MusicalObjectDetection.note_detect_max_area)
-
-    # test notehead template computing
-    note_template, _ = det.get_note_template(keypoints, MusicalObjectDetection.note_template_size)
-    notes, _ = det.adaptive_notehead_detect(note_template, MusicalObjectDetection.note_detect_tol_ratio, MusicalObjectDetection.chord_specs)
-
-    # Compute the staff feature map
-    featmap, stave_lens, col_w = MusicalObjectDetection.compute_staff_feature_map(hlines, 
-                                                               MusicalObjectDetection.stave_feat_map_n_cols, 
-                                                               MusicalObjectDetection.stave_feat_map_lower_bound, 
-                                                               MusicalObjectDetection.stave_feat_map_upper_bound, 
-                                                               MusicalObjectDetection.stave_feat_map_step)
-    
-
-
-    est_staff_lines, staff_len = QueryProcessing.estimate_staff_line_locs(featmap, notes, stave_lens, col_w, QueryProcessing.max_delta_row_initial, int(-2*QueryProcessing.target_line_sep))
-    QueryProcessing.visualize_pred_staff_lines(est_staff_lines, hlines)
-    print(f'Estimated staff length: {staff_len}')
-    return hlines, featmap, notes, stave_lens, col_w, est_staff_lines
-
-
-def test_global_staff_estimation(img_file):
-    proc = QueryProcessing(img_file)
-    det = proc.assign_detector()
-    norm = proc.get_normalized_pre_processed_image()
-
-    hlines, featmap, notes, stave_lens, col_w, est_staff_lines = test_local_staff_estimation(img_file)
-
-    # test staff midpoints clustering
+    # global staff midpoints clustering
     stave_mid_pts = QueryProcessing.estimate_staff_midpoints(est_staff_lines, QueryProcessing.min_num_staves, QueryProcessing.max_num_staves, QueryProcessing.min_stave_separation)
-    QueryProcessing.visualize_staff_midpoint_clustering(est_staff_lines, stave_mid_pts)
-    stave_idxs, nh_row_offsets = QueryProcessing.assign_noteheads_to_staves(notes, stave_mid_pts)
-    QueryProcessing.visualize_clusters(norm, notes, stave_idxs)
+    stave_idxs, nh_row_offsets = QueryProcessing.assign_noteheads_to_staves(note_centers, stave_mid_pts)
+    if verbose: QueryProcessing.visualize_clusters(proc.norm_inv_img, note_centers, stave_idxs)
 
-    # test refined staff lines estimation
-    est_staff_line_locs, staff_len = QueryProcessing.estimate_staff_line_locs(featmap, notes, stave_lens, col_w, 
-                                                                                 QueryProcessing.max_delta_row_refined, 
-                                                                                 (nh_row_offsets-2*QueryProcessing.target_line_sep).astype(int))
-    QueryProcessing.visualize_pred_staff_lines(est_staff_line_locs, hlines)
-    print(f'Estimated staff length: {staff_len}')
+    # refined staff lines estimation
+    est_staff_line_locs, staff_len = QueryProcessing.estimate_staff_line_locs(staff_featmap, note_centers, stave_lens, col_w, 
+                                                                              QueryProcessing.max_delta_row_refined, 
+                                                                              (nh_row_offsets-2*QueryProcessing.target_line_sep).astype(int))
+    if verbose:
+        QueryProcessing.visualize_pred_staff_lines(est_staff_line_locs, hlines)
+        print(f'Estimated staff length: {staff_len}')
 
-    # test note labeling estimation
+    # note labeling estimation
     nh_vals = QueryProcessing.estimate_note_labels(est_staff_line_locs)
-    QueryProcessing.visualize_note_labels(norm, nh_vals, notes)
-    return notes, stave_idxs, stave_mid_pts
+    if verbose: QueryProcessing.visualize_note_labels(proc.norm_inv_img, nh_vals, note_centers)
 
-def test_stave_grouping(img_file):
-    proc = QueryProcessing(img_file)
-    det = proc.assign_detector()
-    norm = proc.get_normalized_pre_processed_image()
+    # CLUSTER NOTES AND STAVES
 
-    # compute bar line features
-    vlines = det.isolate_bar_lines(MusicalObjectDetection.morph_filter_bar_vert, MusicalObjectDetection.morph_filter_bar_hor, MusicalObjectDetection.max_barline_width)
+    det.isolate_bar_lines(MusicalObjectDetection.morph_filter_bar_vert, MusicalObjectDetection.morph_filter_bar_hor, MusicalObjectDetection.max_barline_width)
+    vlines = det.isol_bar_lines
+    if verbose: proc.show_grayscale_image(vlines)
+
     # compute staff midpoints
-    notes, stave_ids, mid_pts = test_global_staff_estimation(img_file)
-    stave_map, evidence = QueryProcessing.determine_stave_grouping(mid_pts, vlines)
-    print(stave_map)
-    plt.plot(np.sum(vlines, axis=1))
-    for m in mid_pts:
-        plt.axvline(m, color = 'r')
-    plt.show()
-    clusters, clusters_pairs = QueryProcessing.cluster_noteheads(stave_ids, stave_map)
-    QueryProcessing.visualize_clusters(norm, notes, clusters)
- 
+    stave_map, evidence = QueryProcessing.determine_stave_grouping(stave_mid_pts, vlines)
+    if verbose:
+        print(f'Evidences median: ({np.median(evidence[2])}, {np.median(evidence[3])})')
+        plt.plot(np.sum(vlines, axis=1))
+        for m in stave_mid_pts:
+            plt.axvline(m, color = 'r')
+        plt.show()
+    note_clusters, clusters_pairs = QueryProcessing.cluster_noteheads(stave_idxs, stave_map)
+    if verbose: QueryProcessing.visualize_clusters(proc.norm_inv_img, note_centers, note_clusters)
 
+    # BOOTLEG SCORE GENERATION
+
+    note_data = [(int(np.round(note_centers[i][0])), int(np.round(note_centers[i][1])), nh_vals[i], note_clusters[i]) for i in range(len(note_centers))]
+
+    bscore_query, events, event_idxs = QueryProcessing.generate_query_bootleg_score(note_data, clusters_pairs, min_col_diff=w_mean, 
+                                                                                    repeat_notes=QueryProcessing.bootleg_repeat_notes, filler=QueryProcessing.bootleg_filler)
+    
+    QueryProcessing.visualize_long_bootleg_score(bscore_query, QueryProcessing.staff_lines_both)
 
 if __name__ == "__main__":
 
@@ -185,13 +120,10 @@ if __name__ == "__main__":
     img_file = 'data/queries/p1_q1.jpg'
     midi_db_dir = 'experiments/train/db'
 
-    #test_staff_lines_detection(img_file)
-    #test_notehead_detection(img_file)
-    #test_barline_detection(img_file)
-    #test_local_staff_estimation(img_file)
-    #test_global_staff_estimation(img_file)
-    test_stave_grouping(img_file)
+    #test_all_query_bootleg_generation(img_file, verbose=False)
 
-    
-    
-    
+    bs_score_midi = BootlegScore.build_from_midi(midi_file)
+    bs_score_midi.visualize_long(MIDIProcessing.staff_lines_both, chuncks_sz=500) # many images
+
+    bs_score_query = BootlegScore.build_from_img(img_file)
+    bs_score_query.visualize(QueryProcessing.staff_lines_both)
