@@ -267,10 +267,22 @@ class MIDIProcessing:
         d[67] = [27] # G4
         return d
     
-    def generate_bootleg_score(self, note_events, repeat_notes = 1, filler = 1):
+    def generate_bootleg_score(self, note_events: list[tuple[int, int, list[int]]], repeat_notes: int = 1, 
+                               filler: int = 1) -> tuple[np.ndarray, list[tuple[int, int]], list[int], tuple[np.ndarrray, list[int]], tuple[np.ndarrray, list[int]]]:
         """
         Generate a bootleg score as a NumPy matrix starting from simultaenous note events collected from a MIDI file.
         To improve empirical results, events are repeated and separated by empty filler columns.
+
+        Params:
+            note_events (list[tuple[int, int, list[int]]]): list of (tick, time, notes) tuples for each note event
+            repeat_notes (int): how many times to repeat each note event
+            filler (int): how many filler colummns to insert between note events
+        Returns:
+            (np.ndarray): the bootleg score for both right and left hands
+            (list[tuple[int, int]]): list of (tsec, ttick) tuples indicating the time in ticks and seconds for each event
+            (list[int]): list with the number of simultaneous notes in each event
+            (tuple[np.ndarray, list[int]]): tuple with the bootleg score for the right hand and the right hand staff lines positions
+            (tuple[np.ndarray, list[int]]): tuple with the bootleg score for the left hand and the left hand staff lines positions
         """
         rh_dim = 34 # notes included in the right hand staff: E3 to C8 (inclusive)
         lh_dim = 28 # notes included in the left hand staff: A1 to G4 (inclusive)
