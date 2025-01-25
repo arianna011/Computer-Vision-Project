@@ -39,10 +39,6 @@ class QueryProcessing:
     staff_lines_LH = [13,15,17,19,21]
     staff_lines_both = [13,15,17,19,21,35,37,39,41,43]
 
-    ## Alignment
-    dtw_steps = [1,1,1,2,2,1] # dtw
-    dtw_weights = [1,1,2]
-
 
     def __init__(self, image_file: str):
         """

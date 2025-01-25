@@ -1,21 +1,34 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import pickle
 from MIDI_Retrieval_System.processing_image import QueryProcessing
 from MIDI_Retrieval_System.processing_midi import MIDIProcessing
+from MIDI_Retrieval_System import alignment as align
 
 class BootlegScore:
     """
     Feature representation to encode the position of noteheads in relation to staff lines in sheet music.
     """
-    
+
+    staff_lines = [13,15,17,19,21,35,37,39,41,43] # locations of staff lines for both right and left hand
+    # Alignment parameters
+    dtw_steps = [1,1,1,2,2,1]
+    dtw_weights = [1,1,2]
+ 
     def __init__(self, X):
         """
         Initialize the BootlegScore with a NumPy array representing the bootleg score.
         
         Parameters:
-        - X (numpy.ndarray): 2D array representing the bootleg score image.
+        - X (numpy.ndarray): 2D array representing the bootleg score image
         """
         self.X = X
+        self.type = None # can be "MIDI" or "Image", indicates the source of the bootleg
+
+        # parameters for "MIDI" bootleg score
+        self.times = None
+        self.num_notes = None
+        self.note_events = None
 
 
     def visualize(self, staff_lines, sz=(10,10)):
@@ -55,9 +68,12 @@ class BootlegScore:
         """
         midi = MIDIProcessing(midi_file)
         events, _ =  midi.get_note_events(quant=midi.time_quant_factor)
-        bs, _, _, _, _ = midi.generate_bootleg_score(events, 2, 2)
-        return BootlegScore(bs)
-
+        bs, times, num_notes, _, _ = midi.generate_bootleg_score(events, 2, 2)
+        obj = BootlegScore(bs)
+        obj.type = "MIDI"
+        obj.times = times
+        obj.num_notes = num_notes
+        return obj
 
     @staticmethod
     def build_from_img(img_file):
@@ -126,10 +142,69 @@ class BootlegScore:
         bscore_query, _, _ = QueryProcessing.generate_query_bootleg_score(note_data, clusters_pairs, min_col_diff=w_mean, 
                                                                                         repeat_notes=QueryProcessing.bootleg_repeat_notes, filler=QueryProcessing.bootleg_filler)
         
-        return BootlegScore(bscore_query)
+        obj = BootlegScore(bscore_query)
+        obj.type = "Image"
+        return obj
+    
+    @staticmethod
+    def load_midi_bootleg(pkl_file: str):
+        """
+        Load the bootleg score corresponding to a MIDI file stored in the input pickle file
+
+        Params:
+            pkl_file (str): path of the pickle file
+
+        Returns:
+            (BootlegScore): a BootlegScore object loaded from the input file
+        """
+        with open(pkl_file, 'rb') as f:
+            d = pickle.load(f)
+        bscore = d['bscore']
+        miditimes = d['times']
+        num_notes = np.array(d['num_notes'])
+        obj = BootlegScore(bscore)
+        obj.type = "MIDI"
+        obj.times = miditimes
+        obj.num_notes = num_notes
+        return obj
     
 
+    def align_to_midi(self, ref, optimized = True) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Compute the alignment between this query "Image" bootleg and the input "MIDI" reference bootleg score via Dynamic Time Warping (DTW)
 
+        Params:
+            ref (BootlegScore): the reference "MIDI" bootleg score
+            optimized (bool): whether to use the optimized cython version of DTW
+
+        Returns:
+            (np.ndarray): the accumulated cost matrix computed by DTW, of dim = (n_query_frames x n_ref_frames);
+                        each entry D[i, j] represents the minimum cost to align the first i frames of query with the first j frames of ref
+            (np.ndarray): the optimal warping path, of dim = (n_steps x 2), represented as a sequence of (query_frame_index, ref_frame_index) pairs;
+                        each pair shows which frame in the query aligns with which frame in the ref
+        """
+        if (not self.type == "Image") or (not ref.type == "MIDI"):
+            print("ERROR: must call 'align_to_midi' method from an 'Image' bootleg, with a 'MIDI' bootleg input")
+            return
+        return align.align_bootleg_scores(self.X, ref.X, ref.num_notes, BootlegScore.dtw_steps, BootlegScore.dtw_weights, optimized)
     
 
+    def align_to_query(self, query, optimized = True) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Compute the alignment between this reference "MIDI" bootleg and the input "Image" query bootleg score via Dynamic Time Warping (DTW)
+
+        Params:
+            query (BootlegScore): the query "Image" bootleg score
+            optimized (bool): whether to use the optimized cython version of DTW
+
+        Returns:
+            (np.ndarray): the accumulated cost matrix computed by DTW, of dim = (n_query_frames x n_ref_frames);
+                        each entry D[i, j] represents the minimum cost to align the first i frames of query with the first j frames of ref
+            (np.ndarray): the optimal warping path, of dim = (n_steps x 2), represented as a sequence of (query_frame_index, ref_frame_index) pairs;
+                        each pair shows which frame in the query aligns with which frame in the ref
+        """
+        if (not self.type == "MIDI") or (not query.type == "Image"):
+            print("ERROR: must call 'align_to_query' method from a 'MIDI' bootleg, with an 'Image' bootleg input")
+            return
+        return align.align_bootleg_scores(query.X, self.X, self.num_notes, BootlegScore.dtw_steps, BootlegScore.dtw_weights, optimized)
 
