@@ -127,3 +127,9 @@ class BootlegScore:
                                                                                         repeat_notes=QueryProcessing.bootleg_repeat_notes, filler=QueryProcessing.bootleg_filler)
         
         return BootlegScore(bscore_query)
+    
+
+
+    
+
+
