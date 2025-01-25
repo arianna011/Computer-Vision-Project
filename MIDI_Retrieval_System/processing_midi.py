@@ -268,7 +268,7 @@ class MIDIProcessing:
         return d
     
     def generate_bootleg_score(self, note_events: list[tuple[int, int, list[int]]], repeat_notes: int = 1, 
-                               filler: int = 1) -> tuple[np.ndarray, list[tuple[int, int]], list[int], tuple[np.ndarrray, list[int]], tuple[np.ndarrray, list[int]]]:
+                               filler: int = 1) -> tuple[np.ndarray, list[tuple[int, int]], list[int], tuple[np.ndarray, list[int]], tuple[np.ndarray, list[int]]]:
         """
         Generate a bootleg score as a NumPy matrix starting from simultaenous note events collected from a MIDI file.
         To improve empirical results, events are repeated and separated by empty filler columns.
