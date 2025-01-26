@@ -79,7 +79,7 @@ def align_bootleg_scores(query: np.ndarray, ref: np.ndarray, num_ref_notes: int,
 
 def plot_alignment(D: np.ndarray, wp: np.ndarray, seg_info: tuple[tuple[float,float], list[tuple[float,float]], list[tuple[float, float]]] = None, fig_sz: tuple[int, int] = (10,10)):
     """
-    Plot the accumulated cost metric of an alignment with overlayed warping path and segment information (if provided)
+    Plot the accumulated cost metric of an alignment as an heatmap with overlayed optimal warping path and segment information (if provided)
 
     Params:
         D (np.ndarray): the accumulated cost matrix computed by DTW, of dim = (n_query_frames x n_ref_frames);
@@ -103,9 +103,9 @@ def plot_alignment(D: np.ndarray, wp: np.ndarray, seg_info: tuple[tuple[float,fl
         for i,ref_seg_col in enumerate(ref_seg_cols):
             plt.axvline(ref_seg_col[0], color = 'm') # mark the boundaries of each segment with vertical lines
             plt.axvline(ref_seg_col[1], color = 'm')
-            plt.title('Hyp ({:.1f} s, {:.1f} s), Ref ({:.1f} s, {:.1f} s)'.format(match_seg_time[0], match_seg_time[1], ref_seg_times[i][0], ref_seg_times[i][1]))
-        else:
-            plt.title('Subsequence DTW Alignment')   
+            plt.title('Hyp ({:.1f} s, {:.1f} s), Ref ({:.1f} s, {:.1f} s)'.format(match_seg_time[0], match_seg_time[1], ref_seg_times[0][0], ref_seg_times[0][1]))
+    else:
+        plt.title('Subsequence DTW Alignment')   
     plt.show() 
 
 def get_predicted_timestamps(wp: np.ndarray, times: list[tuple[float, float]]) -> tuple[tuple[float, float], tuple[float, float]]:

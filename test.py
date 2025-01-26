@@ -135,4 +135,6 @@ if __name__ == "__main__":
     piece_str = os.path.basename(img_file).split('_')[0]
     midi_bscore_pkl = '{}/{}.pkl'.format(midi_db_dir, piece_str)
     bscore_midi = BootlegScore.load_midi_bootleg(midi_bscore_pkl)
-    D, wp = bscore_midi.align_to_query(bs_score_query)
+    bscore_midi.align_to_query(bs_score_query)
+    bscore_midi.visualize_alignment()
+    #bscore_midi.visualize_aligned_bootleg_scores()

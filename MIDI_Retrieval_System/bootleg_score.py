@@ -30,6 +30,14 @@ class BootlegScore:
         self.num_notes = None
         self.note_events = None
 
+        # parameters for "Image" bootleg score
+        self.img_file = None # path of the original image
+
+        # parameters for alignment between this and another bootleg score
+        self.aligned_to = None # last bootleg score this bootleg has been aligned to
+        self.cost_matr = None       # returned by DTW
+        self.warping_path = None    # returned by DTW
+
 
     def visualize(self, staff_lines, sz=(10,10)):
         """
@@ -107,7 +115,11 @@ class BootlegScore:
         keypoints, _ = det.detect_notehead_blobs(min_area=det.note_detect_min_area, 
                                                                   max_area = det.note_detect_max_area)
         note_template, _ = det.get_note_template(keypoints, det.note_template_size)
-        _, img_bin_notes = det.adaptive_notehead_detect(note_template, det.note_detect_tol_ratio, det.chord_specs)
+        notes, _ = det.adaptive_notehead_detect(note_template, det.note_detect_tol_ratio, det.chord_specs)
+
+        if len(notes) < QueryProcessing.max_num_staves: # if few or no notes detected, stop early (avoids later errors during kmeans clustering)
+            return None
+
         note_centers, h_mean, w_mean = det.get_notehead_info()
 
         # INFER NOTES VALUES
@@ -144,6 +156,7 @@ class BootlegScore:
         
         obj = BootlegScore(bscore_query)
         obj.type = "Image"
+        obj.img_file = img_file
         return obj
     
     @staticmethod
@@ -186,7 +199,11 @@ class BootlegScore:
         if (not self.type == "Image") or (not ref.type == "MIDI"):
             print("ERROR: must call 'align_to_midi' method from an 'Image' bootleg, with a 'MIDI' bootleg input")
             return
-        return align.align_bootleg_scores(self.X, ref.X, ref.num_notes, BootlegScore.dtw_steps, BootlegScore.dtw_weights, optimized)
+        D, wp = align.align_bootleg_scores(self.X, ref.X, ref.num_notes, BootlegScore.dtw_steps, BootlegScore.dtw_weights, optimized)
+        self.aligned_to = ref
+        self.cost_matr = D
+        self.warping_path = wp
+        return D, wp
     
 
     def align_to_query(self, query, optimized = True) -> tuple[np.ndarray, np.ndarray]:
@@ -206,5 +223,56 @@ class BootlegScore:
         if (not self.type == "MIDI") or (not query.type == "Image"):
             print("ERROR: must call 'align_to_query' method from a 'MIDI' bootleg, with an 'Image' bootleg input")
             return
-        return align.align_bootleg_scores(query.X, self.X, self.num_notes, BootlegScore.dtw_steps, BootlegScore.dtw_weights, optimized)
+        D, wp = align.align_bootleg_scores(query.X, self.X, self.num_notes, BootlegScore.dtw_steps, BootlegScore.dtw_weights, optimized)
+        self.aligned_to = query
+        self.cost_matr = D
+        self.warping_path = wp
+        return D, wp
+    
 
+    def visualize_alignment(self):
+        """
+        If present, plot the last alignment computed between this bootleg score and another via DTW.
+        """
+        bs, D, wp = self.aligned_to, self.cost_matr, self.warping_path
+        if bs is None or D is None or wp is None:
+            print("No alignment computed for this BootlegScore object")
+            return
+        midi_times = self.times if self.type == 'MIDI' else bs.times
+        img_file = self.img_file if self.type == 'Image' else bs.img_file
+        matched_seg_time, _ = align.get_predicted_timestamps(wp, midi_times) # predicted timestamp in seconds for start and end of the matched segment in the MIDI
+        ref_seg_times, ref_seg_cols = align.get_ground_truth_timestamps(img_file, midi_times) # real timestamps and corresponding bootleg columns from query info file
+        seg_info = (matched_seg_time, ref_seg_times, ref_seg_cols)
+        align.plot_alignment(D, wp, seg_info)
+
+
+    def visualize_aligned_bootleg_scores(self):
+        """
+        If this bootleg score has been aligned to another via DTW, visualize them in the same plot (one on top of the other for each grand staff line)
+        """
+        bs, D, wp = self.aligned_to, self.cost_matr, self.warping_path
+        if bs is None or D is None or wp is None:
+            print("No alignment computed for this BootlegScore object")
+            return
+        if self.type == 'Image':
+            align.visualize_aligned_bootleg_scores(self.X, bs.X, wp, BootlegScore.staff_lines)
+        else:
+            align.visualize_aligned_bootleg_scores(bs.X, self.X, wp, BootlegScore.staff_lines)
+
+    
+    @staticmethod
+    def get_predicted_timestamps(wp: np.ndarray, times: list[tuple[float, float]]) -> tuple[tuple[float, float], tuple[float, float]]:
+        """
+        Extract the predicted start and end timestamps (in seconds and MIDI ticks) in the MIDI reference sequence 
+        that correspond to the warping path's start and end points.
+
+        Params:
+            wp (np.ndarray): the optimal warping path, of dim = (n_steps x 2), represented as a sequence of (query_frame_index, ref_frame_index) pairs;
+                                each pair shows which frame in the query aligns with which frame in the ref
+            times (list[tuple[float, float]]): list of (tsec, ttick) tuples indicating the time in ticks and seconds for each event in a MIDI file
+
+        Returns:
+            (tuple[float, float]): predicted start and end timestamps in seconds
+            (tuple[float, float]): predicted start and end timestamps in MIDI ticks
+        """
+        return align.get_predicted_timestamps(wp, times)
