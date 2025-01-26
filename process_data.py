@@ -31,7 +31,7 @@ def process_query(img_file: str, midi_bscore_pkl: str, out_file: str = None) -> 
     print(f"Processing {img_file}")
     profile_start = time.time()
 
-    bscore_query, _, _ = BootlegScore.build_from_img(img_file)
+    bscore_query = BootlegScore.build_from_img(img_file)
     if bscore_query is None:
         save_to_file(out_file, img_file, (0,0), time.time() - profile_start)
         return (0,0)
@@ -66,7 +66,7 @@ def save_to_file(out_file: str, img_file: str, segment: tuple[float, float], dur
             f.write(out_str)
 
 
-def process_query_wrapper(query_file: str, midi_dir: str, out_dir: str) -> tuple[float, float]:
+def process_query_wrapper(query_file: str, midi_dir: str, out_dir: str, re_compute: bool = False) -> tuple[float, float]:
     """
     Wraps the query processing for running multiple jobs in parallel
 
@@ -74,6 +74,7 @@ def process_query_wrapper(query_file: str, midi_dir: str, out_dir: str) -> tuple
         query_file (str): path to the input query image (in the format "pN_qM.jpg", where N identifies the piece and M the query related to that piece)
         midi_dir (str): path to the directory containing MIDI bootleg .pkl files
         out_dir (str): path to the directory where to save processing results
+        re_compute (bool): whether to overwrite already existing output files
     
     Returns:
         (tuple[float, float]): predicted start and end timestamps in seconds of the segment in the MIDI file matched to the query
@@ -82,10 +83,18 @@ def process_query_wrapper(query_file: str, midi_dir: str, out_dir: str) -> tuple
     hyp_outfile = "{}/{}.hyp".format(out_dir, basename)
     piece = basename.split('_')[0]
     midi_bootleg_file = "{}/{}.pkl".format(midi_dir, piece)
+
+    if (not re_compute) and (os.path.isfile(hyp_outfile)): # file already exists
+        print(f'Opening {hyp_outfile}')
+        with open(hyp_outfile, 'r') as f:
+            line = f.readline()  
+            _, t_1, t_2, _ = line.strip().split(",")  
+        return (t_1, t_2)
+
     return process_query(query_file, midi_bootleg_file, hyp_outfile)
 
 
-def process_all_queries(query_list: str = query_list, midi_bs_dir: str = midi_bs_dir, out_dir: str = out_dir) -> list[tuple[float, float]]:
+def process_all_queries(query_list: str = query_list, midi_bs_dir: str = midi_bs_dir, out_dir: str = out_dir, re_compute: bool = False) -> list[tuple[float, float]]:
     """
     Process all the query images specified in the list in input
 
@@ -93,6 +102,7 @@ def process_all_queries(query_list: str = query_list, midi_bs_dir: str = midi_bs
         query_list (str): path to the file containing the list of file paths of query images to process
         midi_bs_dir (str): path to the directory containing MIDI bootleg .pkl files
         out_dir (str): path to the directory where to store processing results
+        re_compute (bool): whether to overwrite already existing output files
 
     Returns:
         (list[tuple[float, float]]): list of predicted start and end timestamps in seconds of the segments in the MIDI files matched to the corresponding queries
@@ -111,7 +121,7 @@ def process_all_queries(query_list: str = query_list, midi_bs_dir: str = midi_bs
     inputs = []
     with open(query_list, 'r') as f:
         for line in f:
-            inputs.append((line.rstrip(), midi_bs_dir, out_dir))
+            inputs.append((line.rstrip(), midi_bs_dir, out_dir, re_compute))
 
     # process queries in parallel
     pool = multiprocessing.Pool(processes=n_cores)
