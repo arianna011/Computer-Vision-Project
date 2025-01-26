@@ -140,5 +140,6 @@ if __name__ == "__main__":
     # bscore_midi.visualize_alignment()
     #bscore_midi.visualize_aligned_bootleg_scores()
 
+    process_data.process_all_midis()
     outs = process_data.process_all_queries() # takes a while
     print(outs)

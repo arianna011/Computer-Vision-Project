@@ -48,20 +48,6 @@ class MIDIProcessing:
         with open(outfile, 'wb') as file:
             pickle.dump(d, file)
 
-    @staticmethod
-    def process_midi_batch(file_list: str, outdir: str):
-        """
-        Process the batch of MIDI files specified in the list contained in file_list and store the results in outdir.
-        """
-        os.makedirs(outdir, exist_ok=True)
-
-        with open(file_list, 'r') as file:
-            for f in file:
-                f = f.rstrip()
-                basename = os.path.splitext(os.path.basename(f))[0]
-                outfile = f"{outdir}/{basename}.pkl"
-                MIDIProcessing(f).process(outfile)
-
 
     def get_note_events(self, quant: int = 10):
         """

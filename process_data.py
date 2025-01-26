@@ -1,4 +1,4 @@
-from MIDI_Retrieval_System import BootlegScore
+import MIDI_Retrieval_System.bootleg_score as bs
 import time
 import os
 import multiprocessing
@@ -9,10 +9,39 @@ Functions to process the query images in the dataset
 """
 
 # standard directories for processing
-query_list = 'cfg_files/query.train.list' # list of query images
+query_list = 'cfg_files/query.train.list' # list of query images paths
+midi_list = 'cfg_files/midi.train.list' # list of midi files paths
 midi_bs_dir = 'experiments/train/db' # directory containing midi bootleg scores
 out_dir = 'experiments/train/hyp' # where to save hypothesis output files
 
+score_info = 'data/score_info'
+midi_info = 'data/midi_info'
+query_info = 'data/query_info/query_info.csv'
+mult_matches_file ='data/query_info/query.multmatches'
+query_gt_file = 'data/query_info/query.gt'
+
+
+def process_all_midis(file_list: str = midi_list, out_dir: str = midi_bs_dir, re_compute: bool = False):
+    """
+    Process the batch of MIDI files specified in the input file
+    by converting them to bootleg scores and storing them in the output directory as .pkl files
+
+    Params:
+        file_list (str): path to the file containing the paths of the MIDI files to process
+        out_dir (str): path of the output directory
+        re_compute (bool): whether to re-compute pre-existing MIDI bootlegs
+    """
+    os.makedirs(out_dir, exist_ok=True)
+
+    with open(file_list, 'r') as file:
+        for f in file:
+            f = f.rstrip()
+            basename = os.path.splitext(os.path.basename(f))[0]
+            outfile = f"{out_dir}/{basename}.pkl"
+            if (not re_compute) and (os.path.isfile(outfile)): # file already exists
+                print(f'Skipping {outfile}')
+            else:
+                bs.MIDIProcessing(f).process(outfile)
 
 def process_query(img_file: str, midi_bscore_pkl: str, out_file: str = None) -> tuple[float, float]:
     """
@@ -31,15 +60,15 @@ def process_query(img_file: str, midi_bscore_pkl: str, out_file: str = None) -> 
     print(f"Processing {img_file}")
     profile_start = time.time()
 
-    bscore_query = BootlegScore.build_from_img(img_file)
+    bscore_query = bs.BootlegScore.build_from_img(img_file)
     if bscore_query is None:
         save_to_file(out_file, img_file, (0,0), time.time() - profile_start)
         return (0,0)
     
 
-    bscore_midi = BootlegScore.load_midi_bootleg(midi_bscore_pkl)
+    bscore_midi = bs.BootlegScore.load_midi_bootleg(midi_bscore_pkl)
     D, wp = bscore_midi.align_to_query(bscore_query)
-    match_seg_time, _ = BootlegScore.get_predicted_timestamps(wp, bscore_midi.times)
+    match_seg_time, _ = bs.BootlegScore.get_predicted_timestamps(wp, bscore_midi.times)
         
     # profile & save to file
     profile_end = time.time()
