@@ -118,6 +118,7 @@ class BootlegScore:
         notes, _ = det.adaptive_notehead_detect(note_template, det.note_detect_tol_ratio, det.chord_specs)
 
         if len(notes) < QueryProcessing.max_num_staves: # if few or no notes detected, stop early (avoids later errors during kmeans clustering)
+            print("No notes detected in the image")
             return None
 
         note_centers, h_mean, w_mean = det.get_notehead_info()
@@ -179,6 +180,26 @@ class BootlegScore:
         obj.type = "MIDI"
         obj.times = miditimes
         obj.num_notes = num_notes
+        return obj
+
+    @staticmethod
+    def load_img_bootleg(pkl_file: str):
+        """
+        Load the bootleg score corresponding to an image stored in the input pickle file
+
+        Params:
+            pkl_file (str): path of the pickle file
+
+        Returns:
+            (BootlegScore): a BootlegScore object loaded from the input file
+        """
+        with open(pkl_file, 'rb') as f:
+            d = pickle.load(f)
+        bscore = d['bscore']
+        imgfile = d['image_file']
+        obj = BootlegScore(bscore)
+        obj.type = "Image"
+        obj.img_file = imgfile
         return obj
     
 
