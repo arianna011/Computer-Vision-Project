@@ -121,25 +121,25 @@ def test_all_query_bootleg_generation(img_file, verbose=True):
 if __name__ == "__main__":
 
     # random examples
-    # midi_file = './data/midi/p91.mid'
-    # img_file = 'data/queries/p1_q1.jpg'
-    # midi_db_dir = 'experiments/train/db'
+    midi_file = './data/midi/p91.mid'
+    img_file = 'data/queries/p1_q1.jpg'
+    midi_db_dir = 'experiments/train/db'
 
     #test_all_query_bootleg_generation(img_file, verbose=False)
 
-    #bs_score_midi = BootlegScore.build_from_midi(midi_file)
+    bs_score_midi = BootlegScore.build_from_midi(midi_file)
     # bs_score_midi.visualize_long(MIDIProcessing.staff_lines_both, chuncks_sz=500) # many images
 
-    # bs_score_query = BootlegScore.build_from_img(img_file)
+    bs_score_query = BootlegScore.build_from_img(img_file)
     # bs_score_query.visualize(QueryProcessing.staff_lines_both)
 
     # test alignment
-    # piece_str = os.path.basename(img_file).split('_')[0]
-    # midi_bscore_pkl = '{}/{}.pkl'.format(midi_db_dir, piece_str)
-    # bscore_midi = BootlegScore.load_midi_bootleg(midi_bscore_pkl)
-    # bscore_midi.align_to_query(bs_score_query)
-    # bscore_midi.visualize_alignment()
-    #bscore_midi.visualize_aligned_bootleg_scores()
+    piece_str = os.path.basename(img_file).split('_')[0]
+    midi_bscore_pkl = '{}/{}.pkl'.format(midi_db_dir, piece_str)
+    bscore_midi = BootlegScore.load_midi_bootleg(midi_bscore_pkl)
+    bscore_midi.align_to_query(bs_score_query)
+    bscore_midi.visualize_alignment()
+    bscore_midi.visualize_aligned_bootleg_scores()
 
     # process_data.process_all_midis()
     # outs = process_data.process_all_queries() # takes a while
@@ -150,7 +150,7 @@ if __name__ == "__main__":
     # query_info = process_data.get_query_ground_truth(score_info, midi_info)
     # process_data.save_query_info_to_file(query_info)
 
-    F, P, R, hyp_info = eval.compute_precision_recall()
-    print(f'F-score: {F}, Precision: {P}, Recall: {R}')
-    # eval.print_debugging_info(score_info, midi_info, query_info, hyp_info)
-    eval.show_runtime_stats()
+    # F, P, R, hyp_info = eval.compute_precision_recall()
+    # print(f'F-score: {F}, Precision: {P}, Recall: {R}')
+    # # eval.print_debugging_info(score_info, midi_info, query_info, hyp_info)
+    # eval.show_runtime_stats()
