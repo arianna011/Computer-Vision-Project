@@ -223,8 +223,8 @@ class MusicalObjectDetection:
         img = MusicalObjectDetection.morph_filter_circle(self.img, MusicalObjectDetection.morph_filter_circ_dilate, MusicalObjectDetection.morph_filter_circ_erode)
 
         #img = np.array(self.img)
-        cv2.imshow('image_before',img)
-        cv2.waitKey(0)
+        #cv2.imshow('image_before',img)
+        #cv2.waitKey(0)
         # define blob detector parameters
         params = cv2.SimpleBlobDetector_Params()
 
@@ -261,10 +261,11 @@ class MusicalObjectDetection:
         detector = cv2.SimpleBlobDetector_create(params)
 
         keypoints = detector.detect(img)
-        print(f'Number of keypoints detected: {len(keypoints)}')
+        
+        #print(f'Number of keypoints detected: {len(keypoints)}')
         im_with_keypoints = cv2.drawKeypoints(np.array(img), keypoints, np.array([]), (0,0,255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-        cv2.imshow('image',im_with_keypoints)
-        cv2.waitKey(0)  
+        #cv2.imshow('image',im_with_keypoints)
+        #cv2.waitKey(0)  
         return keypoints, im_with_keypoints 
     
 
