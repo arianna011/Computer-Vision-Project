@@ -114,6 +114,9 @@ class BootlegScore:
         # NOTEHEAD DETECTION
         keypoints, _ = det.detect_notehead_blobs(min_area=det.note_detect_min_area, 
                                                                   max_area = det.note_detect_max_area)
+        if len(keypoints) == 0:
+            print("No noteheads detected in the image")
+            return None
         note_template, _ = det.get_note_template(keypoints, det.note_template_size)
         notes, _ = det.adaptive_notehead_detect(note_template, det.note_detect_tol_ratio, det.chord_specs)
 

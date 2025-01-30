@@ -6,6 +6,7 @@ import os
 import process_data
 import evaluation as eval
 import pdf2image
+from main import find_image
 
 def test_bootleg_score(midi_file):
     # visualize bootleg score
@@ -135,12 +136,15 @@ if __name__ == "__main__":
     # bs_score_query.visualize(QueryProcessing.staff_lines_both)
 
 
-    images = pdf2image.convert_from_path('./data/pdfs/p11.pdf')
-    bs_score_query = BootlegScore.build_from_img(images[2])
-    bs_score_query.visualize(QueryProcessing.staff_lines_both)
-
+    # test pdf to image
+    #images = pdf2image.convert_from_path('./data/pdfs/p1.pdf')
+    #bs_score_query = BootlegScore.build_from_img(images[0])
+    #bs_score_query.visualize(QueryProcessing.staff_lines_both)
+    
     #process_data.process_all_pdfs(re_compute=True)
 
+    find_image(img_file, 'MIDI')
+    
     # test alignment
     #bs_score_pdf = BootlegScore.load_img_bootleg('experiments/train/pdf/p11_1.pkl')
     #bs_score_pdf.visualize(QueryProcessing.staff_lines_both)
@@ -154,8 +158,6 @@ if __name__ == "__main__":
     #bscore_midi.visualize_aligned_bootleg_scores()
 
     #process_data.process_all_pdfs(re_compute=True)
-
-
 
 
     #process_data.process_all_midis()
