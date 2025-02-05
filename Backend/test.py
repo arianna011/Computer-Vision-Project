@@ -140,17 +140,3 @@ if __name__ == "__main__":
     bscore_midi.align_to_query(bs_score_query)
     bscore_midi.visualize_alignment()
     bscore_midi.visualize_aligned_bootleg_scores()
-
-    # process_data.process_all_midis()
-    # outs = process_data.process_all_queries() # takes a while
-    # print(outs)
-
-    # score_info = process_data.import_score_info()
-    # midi_info = process_data.import_midi_info()
-    # query_info = process_data.get_query_ground_truth(score_info, midi_info)
-    # process_data.save_query_info_to_file(query_info)
-
-    # F, P, R, hyp_info = eval.compute_precision_recall()
-    # print(f'F-score: {F}, Precision: {P}, Recall: {R}')
-    # # eval.print_debugging_info(score_info, midi_info, query_info, hyp_info)
-    # eval.show_runtime_stats()

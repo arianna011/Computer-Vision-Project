@@ -216,3 +216,29 @@ def show_runtime_stats(hyp_dir: str = pd.out_dir):
     plt.xlabel('Runtime (sec)')
     plt.ylabel('Count')
     plt.show()
+
+
+if __name__ == "__main__":
+    
+    # eval training set
+    # pd.process_all_midis()
+    # outs = pd.process_all_queries() # takes a while
+
+    score_info = pd.import_score_info()
+    midi_info = pd.import_midi_info()
+    query_info = pd.get_query_ground_truth(score_info, midi_info)
+    pd.save_query_info_to_file(query_info)
+
+    # F, P, R, hyp_info = compute_precision_recall()
+    # print(f'TRAINING F-score: {F}, Precision: {P}, Recall: {R}')
+    # #print_debugging_info(score_info, midi_info, query_info, hyp_info)
+    # show_runtime_stats()
+
+    # eval test set
+    pd.process_all_midis('cfg_files/midi.test.list', 'experiments/test/db')
+    outs = pd.process_all_queries('cfg_files/query.test.list', 'experiments/test/db', 'experiments/test/hyp') # takes a lot
+
+    F, P, R, hyp_info = compute_precision_recall('experiments/test/hyp', 'data/query_info/query.gt')
+    print(f'TEST F-score: {F}, Precision: {P}, Recall: {R}')
+    #print_debugging_info(score_info, midi_info, query_info, hyp_info, 'experiments/test/hyp', 'data/query_info/query.gt')
+    show_runtime_stats('experiments/test/hyp')
