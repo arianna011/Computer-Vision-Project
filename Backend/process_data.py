@@ -67,7 +67,7 @@ def process_all_pdfs(file_list: str = pdf_list, out_dir: str = pdf_bs_dir, re_co
     with open(file_list, 'r') as file:
         for f in file:
             f = f.rstrip()
-            images = pdf2image.convert_from_path(f)
+            images = pdf2image.convert_from_path(f, dpi=300)
             for i, img in enumerate(images):
                 out_file = f"{out_dir}/{os.path.splitext(os.path.basename(f))[0]}_{i}.pkl"
                 
@@ -83,7 +83,6 @@ def process_all_pdfs(file_list: str = pdf_list, out_dir: str = pdf_bs_dir, re_co
                     # saving to file
                     d = {
                             'bscore': bootleg_score_img,
-                            'image_file': img
                         }
                     with open(out_file, 'wb') as file:
                         pickle.dump(d, file)

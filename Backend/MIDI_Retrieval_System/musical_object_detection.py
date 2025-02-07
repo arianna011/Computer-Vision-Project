@@ -222,9 +222,6 @@ class MusicalObjectDetection:
 
         img = MusicalObjectDetection.morph_filter_circle(self.img, MusicalObjectDetection.morph_filter_circ_dilate, MusicalObjectDetection.morph_filter_circ_erode)
 
-        #img = np.array(self.img)
-        #cv2.imshow('image_before',img)
-        #cv2.waitKey(0)
         # define blob detector parameters
         params = cv2.SimpleBlobDetector_Params()
 

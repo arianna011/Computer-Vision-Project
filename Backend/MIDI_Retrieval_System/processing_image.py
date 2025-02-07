@@ -44,11 +44,11 @@ class QueryProcessing:
         """
         Initialize the QueryProcessing with the path of the picture to process.
         """
-        # Carica così oppure passa direttamente l'immagine PIL
+        # load the image from the file path or directly from the PIL image
         if (isinstance(image_file, str)):
             self.image_file = image_file
             self.img = Image.open(image_file)
-        elif (isinstance(image_file, Image.Image)):
+        else:
             self.img = image_file
 
         # convert the image to grayscale via the PIL library 

@@ -130,37 +130,36 @@ if __name__ == "__main__":
     #test_all_query_bootleg_generation(img_file, verbose=False)
 
     #bs_score_midi = BootlegScore.build_from_midi(midi_file)
-    # bs_score_midi.visualize_long(MIDIProcessing.staff_lines_both, chuncks_sz=500) # many images
+    #bs_score_midi.visualize_long(MIDIProcessing.staff_lines_both, chuncks_sz=500) # many images
 
     #bs_score_query = BootlegScore.build_from_img(img_file)
-    # bs_score_query.visualize(QueryProcessing.staff_lines_both)
-
-
-    # test pdf to image
-    #images = pdf2image.convert_from_path('./data/pdfs/p1.pdf')
-    #bs_score_query = BootlegScore.build_from_img(images[0])
     #bs_score_query.visualize(QueryProcessing.staff_lines_both)
-    
-    #process_data.process_all_pdfs(re_compute=True)
 
-    find_image(img_file, 'MIDI')
-    
+
+
+    ### save pdfs' bootleg scores as pickle files
+    # process_data.process_all_pdfs(re_compute=True)
+
+
+    ### test pdf to image
+    #images = pdf2image.convert_from_path('./data/pdfs/p1.pdf', dpi=300)
+    #find_image(images[0], 'MIDI')
+
+    ### test find pdf
+    find_image(img_file, 'PDF')
+
+
     # test alignment
-    #bs_score_pdf = BootlegScore.load_img_bootleg('experiments/train/pdf/p11_1.pkl')
-    #bs_score_pdf.visualize(QueryProcessing.staff_lines_both)
 
     #piece_str = os.path.basename(img_file).split('_')[0]
     #midi_bscore_pkl = '{}/{}.pkl'.format(midi_db_dir, piece_str)
     #bscore_midi = BootlegScore.load_midi_bootleg(midi_bscore_pkl)
     #bscore_midi.align_to_query(bs_score_query)
-    #bs_score_pdf.align_to_midi(bscore_midi)
     #bscore_midi.visualize_alignment()
     #bscore_midi.visualize_aligned_bootleg_scores()
 
-    #process_data.process_all_pdfs(re_compute=True)
-
-
     #process_data.process_all_midis()
+    
     # outs = process_data.process_all_queries() # takes a while
     # print(outs)
 

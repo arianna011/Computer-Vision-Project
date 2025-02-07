@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify
 import os
 import base64
 import io
-from Backend.test import get_bootleg_score  # change to MAIN function
+from Backend import get_bootleg_score  # change to MAIN function
 
 app = Flask(__name__)
 
