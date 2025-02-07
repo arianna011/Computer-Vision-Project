@@ -6,7 +6,9 @@ import os
 import process_data
 import evaluation as eval
 import pdf2image
-from main import find_image
+from main import find_image, find_pdf, main
+import time
+from multiprocessing import Pool
 
 def test_bootleg_score(midi_file):
     # visualize bootleg score
@@ -118,13 +120,42 @@ def test_all_query_bootleg_generation(img_file, verbose=True):
     
     QueryProcessing.visualize_long_bootleg_score(bscore_query, QueryProcessing.staff_lines_both)
 
+
+def test_all_midi_retrieval():
+    start = time.time()
+    queries = [os.path.join('data/queries', q) for q in os.listdir('data/queries')]
+    c=0
+    for q in queries:
+        midi, interval = find_image(q)
+        if not _correct_predict(midi.filename, q):
+            print(f'Failed query: {q}, Matched MIDI: {midi.filename}')
+            c += 1 
+
+    print(f'Total Errors: {c}')
+    end = time.time()
+    print(f"Runtime: {end - start:.4f} secondi")
+
+
+def test_all_pdf_retrieval():
+    start = time.time()
+    queries = [os.path.join('data/queries', q) for q in os.listdir('data/queries')]
+    for q in queries:
+        pdf = main(q, "PDF")
+    end = time.time()
+    print(f"Runtime: {end - start:.4f} secondi")
+
+def _correct_predict(midi_name, query_name):
+    piece_query = "".join([c for c in query_name.split() if c.isdigit()])
+    piece_midi = "".join([c for c in midi_name.split() if c.isdigit()])
+    print(piece_query)
+    return piece_query == piece_midi
    
 
 if __name__ == "__main__":
 
     # random examples
     midi_file = './data/midi/p91.mid'
-    img_file = 'data/queries/p1_q1.jpg'
+    img_file = 'data/queries/p138_q6.jpg'
     midi_db_dir = 'experiments/train/db'
 
     #test_all_query_bootleg_generation(img_file, verbose=False)
@@ -135,24 +166,21 @@ if __name__ == "__main__":
     #bs_score_query = BootlegScore.build_from_img(img_file)
     #bs_score_query.visualize(QueryProcessing.staff_lines_both)
 
-
-
     ### save pdfs' bootleg scores as pickle files
-    # process_data.process_all_pdfs(re_compute=True)
-
+    #process_data.process_all_pdfs()
 
     ### test pdf to image
     #images = pdf2image.convert_from_path('./data/pdfs/p1.pdf', dpi=300)
     #find_image(images[0], 'MIDI')
 
     ### test find pdf
-    find_image(img_file, 'PDF')
+    #find_image(img_file, 'PDF')
 
+    # start = time.time()
+    # midi, interval = find_image(img_file)
+    # end = time.time()
 
-    # test alignment
-    piece_str = os.path.basename(img_file).split('_')[0]
-    midi_bscore_pkl = '{}/{}.pkl'.format(midi_db_dir, piece_str)
-    bscore_midi = BootlegScore.load_midi_bootleg(midi_bscore_pkl)
-    bscore_midi.align_to_query(bs_score_query)
-    bscore_midi.visualize_alignment()
-    bscore_midi.visualize_aligned_bootleg_scores()
+    # print(f"Runtime: {end - start:.4f} secondi")
+
+    #test_all_midi_retrieval()
+    test_all_pdf_retrieval()

@@ -1,3 +1,4 @@
+import PIL.Image
 from MIDI_Retrieval_System import BootlegScore, MIDIProcessing, QueryProcessing, MusicalObjectDetection
 import matplotlib.pyplot as plt
 import numpy as np
@@ -7,104 +8,125 @@ import process_data
 import evaluation as eval
 from skimage.metrics import structural_similarity as ssim
 from mido import MidiFile
-
-"""
-Main function for the Image2Midi app
-
-Params:
-    img
-    option (MIDI or PDF?)
-Returns:
-    MIDI
-    PDF
-"""
+import PIL
+from multiprocessing import Pool
 
 
-def find_image(img, option):
+def main(img: PIL.Image.Image | str, option: str) -> tuple[MidiFile, tuple[float, float]]:
     """
-    Main function for the Image2Midi app that finds the image and returns the MIDI or PDF
+    Main function for the Image2Midi app that, given a query image,
+    based on the option input:
+        - if option = "MIDI", finds and returns the matching MIDI file and the corresponding time interval
+        - if option = "PDF", returns the matching PDF file
     Params:
-        img: image file
-        option: MIDI or PDF
+        img (PIL.Image or str): image file or path to the query image
+        option (str): "MIDI" or "PDF"
     Returns:
-        MIDI or PDF
+        (MidiFile): file MIDI
+        (tuple[float, float]): predicted timestamps in seconds of the segment of the MIDI that matches the query
+        pdf
+    """
+    if option == "MIDI":
+        return find_image(img)
+    elif option == "PDF":
+         return find_pdf(img)
+    else:
+        print("Error: wrong option input ", option)
+     
+
+def find_image(img: PIL.Image.Image | str):
+    """
+    Function for the Image2Midi app that, given a query image, finds and returns the matching MIDI file and the corresponding time interval
+    Params:
+        img (PIL.Image or str): image file or path to the image
+    Returns:
+        (MidiFile): file MIDI
+        (tuple[float, float]): predicted timestamps in seconds of the segment of the MIDI that matches the query
     """
 
     bs_score_query = BootlegScore.build_from_img(img)
 
-    if option == 'MIDI':
-        # process midi batch
-        dir_pkl = 'experiments/train/db'
-        midi_files = os.listdir(dir_pkl)
+    # process midi batch
+    dir_midi = 'data/midi'
+    dir_pkl_train = 'experiments/train/db'
+    dir_pkl_test = 'experiments/test/db'
+    midi_files_train = os.listdir(dir_pkl_train)
+    midi_files_test = os.listdir(dir_pkl_test)
 
-        all_similarity= []
+    all_similarity_train = []
+    all_similarity_test = []
 
-        for midi in midi_files:
-            # path from which we load the midi file 
-            midi_path = os.path.join(dir_pkl, midi)
-            bscore_midi = BootlegScore.load_midi_bootleg(midi_path)
-            # align the query to the midi with dynamic time warping
-            D, wp = bscore_midi.align_to_query(bs_score_query)
-            match_seg_time, _ = BootlegScore.get_predicted_timestamps(wp, bscore_midi.times)
+    with Pool() as pool:
+            all_similarity_train = pool.starmap(_process_midi, [(midi, bs_score_query, dir_pkl_train) for midi in midi_files_train])
+            all_similarity_test = pool.starmap(_process_midi, [(midi, bs_score_query, dir_pkl_test) for midi in midi_files_test])
 
-            # get segments of the scores that match
-            idxs1 = wp[::-1, 0]
-            warped1 = bs_score_query.X[:,idxs1]
-            idxs2 = wp[::-1, 1]
-            warped2 = bscore_midi.X[:,idxs2]
-            
-            # compute similarity between the two segments
-            # TODO: try using DTW data instead of SSIM
-            #similarity = 1 / (1 + D[-1, -1])
-            similarity = ssim(warped1, warped2, data_range=warped2.max() - warped2.min())
-            all_similarity.append((similarity, midi))
+    # take the MIDI with the maximum similarity
+    max_pair_train = max(all_similarity_train, key=lambda x: x[0])  
+    max_pair_test = max(all_similarity_test, key=lambda x: x[0])
+    if max_pair_train > max_pair_test:
+         max_pair = max_pair_train
+    else:
+         max_pair = max_pair_test      
+    midi_file = os.path.join(dir_midi, max_pair[1].replace('.pkl', '.mid'))
+    interval = max_pair[2]
+    print(f"Query {img}: Returning {midi_file}, interval ({interval[0]} s, {interval[1]} s)")
+    return MidiFile(midi_file), interval
 
 
-            # TODO: this is for debugging
-            print(f"Comparing {midi} with {img}")
-            print(f"Similarity: {similarity}")
-       
-        max_pair = max(all_similarity, key=lambda x: x[0])  # Find the pair with the highest similarity
-        dir_midi = 'data/midi'
-        midi_file = os.path.join(dir_midi, max_pair[1].replace('.pkl', '.mid'))
-        print (f"Returning {midi_file}")
-        return MidiFile(midi_file)
+def find_pdf(img: PIL.Image.Image | str):
+    """
+    Function for the Image2Midi app that, given a query image, finds and returns the entire PDF file of the corresponding sheet music
+    Params:
+        img (PIL.Image or str): image file or path to the image
+    Returns:
+        (): PDF file
+    """
+   
+    dir_pdf = 'data/pdfs'
+    dir_pkl = 'experiments/train/pdf'
+    pdf_files = os.listdir(dir_pkl)
+    bscore_query = BootlegScore.build_from_img(img)
 
-    if option == 'PDF':
+    all_similarity= []
 
-        dir_pkl = 'experiments/train/pdf'
-        pdf_files = os.listdir(dir_pkl)
+    with Pool() as pool:
+            all_similarity = pool.starmap(_process_pdf, [(pdf, bscore_query, dir_pkl) for pdf in pdf_files])
 
-        all_similarity= []
+    # take the PDF with the maximum similarity
+    max_pair = max(all_similarity, key=lambda x: x[0])    
+    pdf_file = os.path.join(dir_pdf, f"{max_pair[1].split('_')[0]}.pdf")
+    print(f"Query {img}: Returning {pdf_file}")
+    return pdf_file
 
-        for pdf in pdf_files:
-            # path from which we load the pdf file
-            pdf_path = os.path.join(dir_pkl, pdf)
-            bscore_pdf = BootlegScore.load_pdf_bootleg(pdf_path)
 
-            #TODO: fix function align_to_pdf
-            D, wp = bs_score_query.align_to_pdf(bscore_pdf)
-            #match_seg_time, _ = BootlegScore.get_predicted_timestamps(wp, bscore_pdf.times)
 
-            # get segments of the scores that match
-            idxs1 = wp[::-1, 0]
-            warped1 = bs_score_query.X[:,idxs1]
-            idxs2 = wp[::-1, 1]
-            warped2 = bscore_pdf.X[:,idxs2]
-            
-            # compute similarity between the two segments
-            #similarity = ssim(warped1, warped2, data_range=warped2.max() - warped2.min())
-            similarity = 1 / (1 + D[-1, -1])  
+def _process_pdf(pdf, bscore_query, dir_pkl):
+    pdf_path = os.path.join(dir_pkl, pdf)
+    bscore_pdf = BootlegScore.load_pdf_bootleg(pdf_path)
+    D, wp = bscore_query.align_to_pdf(bscore_pdf)
+    return 1 / (1 + D[-1, -1]), pdf
 
-            all_similarity.append((similarity, pdf))
-    
-            print(f"Comparing {pdf} with {img}")
-            print(f"Similarity: {similarity}")
-            #if match_seg_time is not None:
-            #   print(f"Match found at time {match_seg_time} in {pdf}")
-        
-        max_pair = max(all_similarity, key=lambda x: x[0])  # Find the pair with the highest similarity
-        pdf_dir = 'data/pdfs'
-        pdf_file = os.path.join(pdf_dir, max_pair[1].replace('.pkl', '.pdf'))
-        print (f"Returning {pdf_file}")
-        return pdf_file
+
+
+def _process_midi(midi, bscore_query, dir_pkl):
+    midi_path = os.path.join(dir_pkl, midi)
+    bscore_midi = BootlegScore.load_midi_bootleg(midi_path)
+    D, wp = bscore_midi.align_to_query(bscore_query)
+    match_seg_time, _ = BootlegScore.get_predicted_timestamps(wp, bscore_midi.times)   
+    return _compute_similarity(wp, bscore_query, bscore_midi), midi, match_seg_time
+
+def _compute_similarity(wp, bscore_query, bscore_midi):
+    idxs1 = wp[::-1, 0]
+    warped1 = bscore_query.X[:, idxs1]
+    idxs2 = wp[::-1, 1]
+    warped2 = bscore_midi.X[:, idxs2]
+
+    warped1 = (warped1 - warped1.min()) / (warped1.max() - warped1.min())
+    warped2 = (warped2 - warped2.min()) / (warped2.max() - warped2.min())
+
+    similarity = ssim(warped1, warped2, data_range = max(warped1.max(), warped2.max()) - min(warped1.min(), warped2.min()))
+    return similarity
+
+
+# def _compute_similarity(D):
+#     return np.exp(-D[-1, -1])
