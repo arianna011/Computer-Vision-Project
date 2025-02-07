@@ -24,8 +24,8 @@ class MusicalObjectDetection:
     # Notehead Detection
     morph_filter_circ_dilate = 5
     morph_filter_circ_erode = 5
-    note_detect_min_area = 50
-    note_detect_max_area = 200
+    note_detect_min_area = 50  
+    note_detect_max_area = 200  
     note_template_size = 21
     note_detect_tol_ratio = .4
 
@@ -258,8 +258,11 @@ class MusicalObjectDetection:
         detector = cv2.SimpleBlobDetector_create(params)
 
         keypoints = detector.detect(img)
+        
+        #print(f'Number of keypoints detected: {len(keypoints)}')
         im_with_keypoints = cv2.drawKeypoints(np.array(img), keypoints, np.array([]), (0,0,255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-
+        #cv2.imshow('image',im_with_keypoints)
+        #cv2.waitKey(0)  
         return keypoints, im_with_keypoints 
     
 

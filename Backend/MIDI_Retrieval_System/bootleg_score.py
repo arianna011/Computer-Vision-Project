@@ -104,7 +104,7 @@ class BootlegScore:
         det.isolate_staff_lines(det.morph_filter_rect_len, 
                                 det.notebar_filter_len, 
                                 det.notebar_removal)
-    
+
         # compute staff features
         staff_featmap, stave_lens, col_w = det.compute_staff_feature_map(det.stave_feat_map_n_cols, 
                                                                          det.stave_feat_map_lower_bound, 
@@ -114,10 +114,14 @@ class BootlegScore:
         # NOTEHEAD DETECTION
         keypoints, _ = det.detect_notehead_blobs(min_area=det.note_detect_min_area, 
                                                                   max_area = det.note_detect_max_area)
+        if len(keypoints) == 0:
+            print("No noteheads detected in the image")
+            return None
         note_template, _ = det.get_note_template(keypoints, det.note_template_size)
         notes, _ = det.adaptive_notehead_detect(note_template, det.note_detect_tol_ratio, det.chord_specs)
 
         if len(notes) < QueryProcessing.max_num_staves: # if few or no notes detected, stop early (avoids later errors during kmeans clustering)
+            print("No notes detected in the image")
             return None
 
         note_centers, h_mean, w_mean = det.get_notehead_info()
@@ -180,6 +184,43 @@ class BootlegScore:
         obj.times = miditimes
         obj.num_notes = num_notes
         return obj
+
+    @staticmethod
+    def load_img_bootleg(pkl_file: str):
+        """
+        Load the bootleg score corresponding to an image stored in the input pickle file
+
+        Params:
+            pkl_file (str): path of the pickle file
+
+        Returns:
+            (BootlegScore): a BootlegScore object loaded from the input file
+        """
+        with open(pkl_file, 'rb') as f:
+            d = pickle.load(f)
+        bscore = d['bscore']
+        imgfile = d['image_file']
+        obj = BootlegScore(bscore)
+        obj.type = "Image"
+        obj.img_file = imgfile
+        return obj
+
+    @staticmethod
+    def load_pdf_bootleg(pkl_file: str):
+        """
+        Load the bootleg score corresponding to a PDF file stored in the input pickle file
+
+        Params:
+            pkl_file (str): path of the pickle file
+
+        Returns:
+            (BootlegScore): a BootlegScore object loaded from the input file
+        """
+        with open(pkl_file, 'rb') as f:
+            d = pickle.load(f)
+        obj = d['bscore']
+        obj.type = "Image"
+        return obj
     
 
     def align_to_midi(self, ref, optimized = True) -> tuple[np.ndarray, np.ndarray]:
@@ -199,6 +240,30 @@ class BootlegScore:
         if (not self.type == "Image") or (not ref.type == "MIDI"):
             print("ERROR: must call 'align_to_midi' method from an 'Image' bootleg, with a 'MIDI' bootleg input")
             return
+        D, wp = align.align_bootleg_scores(self.X, ref.X, ref.num_notes, BootlegScore.dtw_steps, BootlegScore.dtw_weights, optimized)
+        self.aligned_to = ref
+        self.cost_matr = D
+        self.warping_path = wp
+        return D, wp
+
+    def align_to_pdf(self, ref, optimized = True) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Compute the alignment between this query "Image" bootleg and the input "PDF" reference bootleg score via Dynamic Time Warping (DTW)
+
+        Params:
+            ref (BootlegScore): the reference "PDF" bootleg score
+            optimized (bool): whether to use the optimized cython version of DTW
+
+        Returns:
+            (np.ndarray): the accumulated cost matrix computed by DTW, of dim = (n_query_frames x n_ref_frames);
+                        each entry D[i, j] represents the minimum cost to align the first i frames of query with the first j frames of ref
+            (np.ndarray): the optimal warping path, of dim = (n_steps x 2), represented as a sequence of (query_frame_index, ref_frame_index) pairs;
+                        each pair shows which frame in the query aligns with which frame in the ref
+        """
+        if (not self.type == "Image") or (not ref.type == "Image"):
+            print("ERROR: must call 'align_to_pdf' method from an 'Image' bootleg, with a 'PDF' bootleg input")
+            return
+        ref.num_notes = np.sum(ref.X, axis=0)
         D, wp = align.align_bootleg_scores(self.X, ref.X, ref.num_notes, BootlegScore.dtw_steps, BootlegScore.dtw_weights, optimized)
         self.aligned_to = ref
         self.cost_matr = D

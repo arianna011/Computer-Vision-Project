@@ -40,12 +40,16 @@ class QueryProcessing:
     staff_lines_both = [13,15,17,19,21,35,37,39,41,43]
 
 
-    def __init__(self, image_file: str):
+    def __init__(self, image_file):
         """
         Initialize the QueryProcessing with the path of the picture to process.
         """
-        self.image_file = image_file
-        self.img = Image.open(image_file)
+        # load the image from the file path or directly from the PIL image
+        if (isinstance(image_file, str)):
+            self.image_file = image_file
+            self.img = Image.open(image_file)
+        else:
+            self.img = image_file
 
         # convert the image to grayscale via the PIL library 
         self.gray_img = self.img.convert('L') # 'L' stands for 'luminance'
