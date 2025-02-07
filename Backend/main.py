@@ -61,15 +61,15 @@ def find_image(img: PIL.Image.Image | str):
             all_similarity_test = pool.starmap(_process_midi, [(midi, bs_score_query, dir_pkl_test) for midi in midi_files_test])
 
     # take the MIDI with the maximum similarity
-    max_pair_train = max(all_similarity_train, key=lambda x: x[0])  
-    max_pair_test = max(all_similarity_test, key=lambda x: x[0])
-    if max_pair_train > max_pair_test:
-         max_pair = max_pair_train
+    min_pair_train = min(all_similarity_train, key=lambda x: x[0])  
+    min_pair_test = min(all_similarity_test, key=lambda x: x[0])
+    if min_pair_train < min_pair_test:
+         min_pair = min_pair_train
     else:
-         max_pair = max_pair_test      
-    midi_file = os.path.join(dir_midi, max_pair[1].replace('.pkl', '.mid'))
-    interval = max_pair[2]
-    print(f"Query {img}: Returning {midi_file}, interval ({interval[0]} s, {interval[1]} s)")
+         min_pair = min_pair_test      
+    midi_file = os.path.join(dir_midi, min_pair[1].replace('.pkl', '.mid'))
+    interval = min_pair[2]
+    #print(f"Query {img}: Returning {midi_file}, interval ({interval[0]} s, {interval[1]} s)")
     return MidiFile(midi_file), interval
 
 
@@ -93,8 +93,8 @@ def find_pdf(img: PIL.Image.Image | str):
             all_similarity = pool.starmap(_process_pdf, [(pdf, bscore_query, dir_pkl) for pdf in pdf_files])
 
     # take the PDF with the maximum similarity
-    max_pair = max(all_similarity, key=lambda x: x[0])    
-    pdf_file = os.path.join(dir_pdf, f"{max_pair[1].split('_')[0]}.pdf")
+    min_pair = min(all_similarity, key=lambda x: x[0])    
+    pdf_file = os.path.join(dir_pdf, f"{min_pair[1].split('_')[0]}.pdf")
     print(f"Query {img}: Returning {pdf_file}")
     return pdf_file
 
@@ -103,17 +103,18 @@ def find_pdf(img: PIL.Image.Image | str):
 def _process_pdf(pdf, bscore_query, dir_pkl):
     pdf_path = os.path.join(dir_pkl, pdf)
     bscore_pdf = BootlegScore.load_pdf_bootleg(pdf_path)
-    D, wp = bscore_query.align_to_pdf(bscore_pdf)
-    return 1 / (1 + D[-1, -1]), pdf
+    D, wp, end_cost = bscore_query.align_to_pdf(bscore_pdf)
+    return end_cost, pdf
 
 
 
 def _process_midi(midi, bscore_query, dir_pkl):
     midi_path = os.path.join(dir_pkl, midi)
     bscore_midi = BootlegScore.load_midi_bootleg(midi_path)
-    D, wp = bscore_midi.align_to_query(bscore_query)
+    D, wp, end_cost = bscore_midi.align_to_query(bscore_query)
     match_seg_time, _ = BootlegScore.get_predicted_timestamps(wp, bscore_midi.times)   
-    return _compute_similarity(wp, bscore_query, bscore_midi), midi, match_seg_time
+    #return _compute_similarity(wp, bscore_query, bscore_midi), midi, match_seg_time
+    return end_cost, midi, match_seg_time
 
 def _compute_similarity(wp, bscore_query, bscore_midi):
     idxs1 = wp[::-1, 0]

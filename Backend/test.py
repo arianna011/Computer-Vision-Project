@@ -9,6 +9,7 @@ import pdf2image
 from main import find_image, find_pdf, main
 import time
 from multiprocessing import Pool
+from multiprocessing import cpu_count
 
 def test_bootleg_score(midi_file):
     # visualize bootleg score
@@ -124,16 +125,20 @@ def test_all_query_bootleg_generation(img_file, verbose=True):
 def test_all_midi_retrieval():
     start = time.time()
     queries = [os.path.join('data/queries', q) for q in os.listdir('data/queries')]
+    queries = queries[:200]
     c=0
     for q in queries:
         midi, interval = find_image(q)
         if not _correct_predict(midi.filename, q):
-            print(f'Failed query: {q}, Matched MIDI: {midi.filename}')
+            #print(f'Failed query: {q}, Matched MIDI: {midi.filename}')
             c += 1 
 
     print(f'Total Errors: {c}')
+    print(f'Total Queries: {len(queries)}')
+    print(f'Accuracy: {1 - c/len(queries)}')
     end = time.time()
     print(f"Runtime: {end - start:.4f} secondi")
+    print(queries)
 
 
 def test_all_pdf_retrieval():
@@ -145,9 +150,10 @@ def test_all_pdf_retrieval():
     print(f"Runtime: {end - start:.4f} secondi")
 
 def _correct_predict(midi_name, query_name):
-    piece_query = "".join([c for c in query_name.split() if c.isdigit()])
-    piece_midi = "".join([c for c in midi_name.split() if c.isdigit()])
-    print(piece_query)
+    query_name = query_name.split('_')[0]
+    piece_query = "".join([c for c in query_name if c.isdigit()])
+    piece_midi = "".join([c for c in midi_name if c.isdigit()])
+    #print(f'Query: {piece_query}, MIDI: {piece_midi}')
     return piece_query == piece_midi
    
 
@@ -174,13 +180,15 @@ if __name__ == "__main__":
     #find_image(images[0], 'MIDI')
 
     ### test find pdf
-    #find_image(img_file, 'PDF')
+    find_pdf(img_file)
 
-    # start = time.time()
-    # midi, interval = find_image(img_file)
-    # end = time.time()
+    #start = time.time()
+    #midi, interval = find_image(img_file)
+    #end = time.time()
 
-    # print(f"Runtime: {end - start:.4f} secondi")
+    #print(f"Runtime: {end - start:.4f} secondi")
+    #print(f"MIDI: {midi.filename}, Interval: {interval}")
+    
 
     #test_all_midi_retrieval()
-    test_all_pdf_retrieval()
+    #test_all_pdf_retrieval()

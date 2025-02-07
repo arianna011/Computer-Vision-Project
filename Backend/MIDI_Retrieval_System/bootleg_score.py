@@ -236,15 +236,16 @@ class BootlegScore:
                         each entry D[i, j] represents the minimum cost to align the first i frames of query with the first j frames of ref
             (np.ndarray): the optimal warping path, of dim = (n_steps x 2), represented as a sequence of (query_frame_index, ref_frame_index) pairs;
                         each pair shows which frame in the query aligns with which frame in the ref
+            (float): the final cost of the alignment
         """
         if (not self.type == "Image") or (not ref.type == "MIDI"):
             print("ERROR: must call 'align_to_midi' method from an 'Image' bootleg, with a 'MIDI' bootleg input")
             return
-        D, wp = align.align_bootleg_scores(self.X, ref.X, ref.num_notes, BootlegScore.dtw_steps, BootlegScore.dtw_weights, optimized)
+        D, wp, end_cost = align.align_bootleg_scores(self.X, ref.X, ref.num_notes, BootlegScore.dtw_steps, BootlegScore.dtw_weights, optimized)
         self.aligned_to = ref
         self.cost_matr = D
         self.warping_path = wp
-        return D, wp
+        return D, wp, end_cost
 
     def align_to_pdf(self, ref, optimized = True) -> tuple[np.ndarray, np.ndarray]:
         """
@@ -259,16 +260,18 @@ class BootlegScore:
                         each entry D[i, j] represents the minimum cost to align the first i frames of query with the first j frames of ref
             (np.ndarray): the optimal warping path, of dim = (n_steps x 2), represented as a sequence of (query_frame_index, ref_frame_index) pairs;
                         each pair shows which frame in the query aligns with which frame in the ref
+            (float): the final cost of the alignment    
         """
         if (not self.type == "Image") or (not ref.type == "Image"):
             print("ERROR: must call 'align_to_pdf' method from an 'Image' bootleg, with a 'PDF' bootleg input")
             return
         ref.num_notes = np.sum(ref.X, axis=0)
-        D, wp = align.align_bootleg_scores(self.X, ref.X, ref.num_notes, BootlegScore.dtw_steps, BootlegScore.dtw_weights, optimized)
+        print(len(ref.num_notes))
+        D, wp, end_cost = align.align_bootleg_scores(self.X, ref.X, ref.num_notes, BootlegScore.dtw_steps, BootlegScore.dtw_weights, optimized)
         self.aligned_to = ref
         self.cost_matr = D
         self.warping_path = wp
-        return D, wp
+        return D, wp, end_cost
     
 
     def align_to_query(self, query, optimized = True) -> tuple[np.ndarray, np.ndarray]:
@@ -284,15 +287,16 @@ class BootlegScore:
                         each entry D[i, j] represents the minimum cost to align the first i frames of query with the first j frames of ref
             (np.ndarray): the optimal warping path, of dim = (n_steps x 2), represented as a sequence of (query_frame_index, ref_frame_index) pairs;
                         each pair shows which frame in the query aligns with which frame in the ref
+            (float): the final cost of the alignment
         """
         if (not self.type == "MIDI") or (not query.type == "Image"):
             print("ERROR: must call 'align_to_query' method from a 'MIDI' bootleg, with an 'Image' bootleg input")
             return
-        D, wp = align.align_bootleg_scores(query.X, self.X, self.num_notes, BootlegScore.dtw_steps, BootlegScore.dtw_weights, optimized)
+        D, wp, end_cost = align.align_bootleg_scores(query.X, self.X, self.num_notes, BootlegScore.dtw_steps, BootlegScore.dtw_weights, optimized)
         self.aligned_to = query
         self.cost_matr = D
         self.warping_path = wp
-        return D, wp
+        return D, wp, end_cost
     
 
     def visualize_alignment(self):
