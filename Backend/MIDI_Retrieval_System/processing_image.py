@@ -1,11 +1,12 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from PIL import Image, ImageFilter, ImageChops
+from PIL import Image, ImageFilter, ImageChops, ImageOps
 import matplotlib.patches as mpatches
 from scipy.signal import convolve2d
 from MIDI_Retrieval_System.musical_object_detection import MusicalObjectDetection
 from sklearn.cluster import KMeans
 import sys
+import cv2
 
 class QueryProcessing:
     """
@@ -48,8 +49,10 @@ class QueryProcessing:
         if (isinstance(image_file, str)):
             self.image_file = image_file
             self.img = Image.open(image_file)
+            self.img = ImageOps.exif_transpose(self.img)
         else:
             self.img = image_file
+            self.img = ImageOps.exif_transpose(self.img)
 
         # convert the image to grayscale via the PIL library 
         self.gray_img = self.img.convert('L') # 'L' stands for 'luminance'
@@ -174,6 +177,7 @@ class QueryProcessing:
                                                     QueryProcessing.est_line_sep_upper_bound, 
                                                     QueryProcessing.est_line_sep_step)
         target_h, target_w = self.calculate_resized_dimensions(estimated_line_sep, QueryProcessing.target_line_sep)
+
         self.pre_processed_img = self.img_no_backgrd_noise.resize((target_w, target_h))
 
         if verbose:

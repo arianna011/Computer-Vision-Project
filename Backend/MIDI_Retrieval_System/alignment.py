@@ -4,8 +4,7 @@ import librosa as lb
 import matplotlib.pyplot as plt
 import os
 from Cython_DTW import optimized_dtw as dtw
-
-    
+ 
 """
 Functions to compute the alignment between a query and a refernece bootleg score.
 """

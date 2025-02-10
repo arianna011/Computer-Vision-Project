@@ -69,7 +69,6 @@ def find_image(img: PIL.Image.Image | str):
          min_pair = min_pair_test      
     midi_file = os.path.join(dir_midi, min_pair[1].replace('.pkl', '.mid'))
     interval = min_pair[2]
-    #print(f"Query {img}: Returning {midi_file}, interval ({interval[0]} s, {interval[1]} s)")
     return MidiFile(midi_file), interval
 
 
@@ -94,40 +93,50 @@ def find_pdf(img: PIL.Image.Image | str):
 
     # take the PDF with the maximum similarity
     min_pair = min(all_similarity, key=lambda x: x[0])    
-    pdf_file = os.path.join(dir_pdf, f"{min_pair[1].split('_')[0]}.pdf")
-    print(f"Query {img}: Returning {pdf_file}")
+    pdf_file = os.path.join(dir_pdf, f"{min_pair[1].split('.')[0]}.pdf")
+
     return pdf_file
 
 
 
 def _process_pdf(pdf, bscore_query, dir_pkl):
+    """
+    Loads the bootleg score of a PDF file and aligns it with the query image bootleg score to find the similarity score between the two
+    Params:
+        pdf (str): PDF file 
+        bscore_query (BootlegScore): bootleg score of the query image
+        dir_pkl (str): directory of the pickle files
+    Returns:
+        (float): similarity score between the query image and the PDF file
+        (str): PDF file 
+    """
     pdf_path = os.path.join(dir_pkl, pdf)
     bscore_pdf = BootlegScore.load_pdf_bootleg(pdf_path)
-    D, wp, end_cost = bscore_query.align_to_pdf(bscore_pdf)
+    if bscore_query is None:
+        end_cost = 1
+    else:
+        D, wp, end_cost = bscore_query.align_to_pdf(bscore_pdf)
     return end_cost, pdf
 
 
 
 def _process_midi(midi, bscore_query, dir_pkl):
+    """
+    Loads the bootleg score of a MIDI file and aligns it with the query image bootleg score to find the similarity score between the two
+    Params:
+        midi (str): MIDI file 
+        bscore_query (BootlegScore): bootleg score of the query image
+        dir_pkl (str): directory of the pickle files
+    Returns:
+        (float): similarity score between the query image and the MIDI file
+        (str): MIDI file 
+        (tuple[float, float]): predicted timestamps in seconds of the segment of the MIDI that matches the query
+    """
     midi_path = os.path.join(dir_pkl, midi)
     bscore_midi = BootlegScore.load_midi_bootleg(midi_path)
+    num_query_notes = len(np.sum(bscore_query.X, axis=0))
     D, wp, end_cost = bscore_midi.align_to_query(bscore_query)
-    match_seg_time, _ = BootlegScore.get_predicted_timestamps(wp, bscore_midi.times)   
-    #return _compute_similarity(wp, bscore_query, bscore_midi), midi, match_seg_time
+    match_seg_time, _ = BootlegScore.get_predicted_timestamps(wp, bscore_midi.times)  
     return end_cost, midi, match_seg_time
 
-def _compute_similarity(wp, bscore_query, bscore_midi):
-    idxs1 = wp[::-1, 0]
-    warped1 = bscore_query.X[:, idxs1]
-    idxs2 = wp[::-1, 1]
-    warped2 = bscore_midi.X[:, idxs2]
 
-    warped1 = (warped1 - warped1.min()) / (warped1.max() - warped1.min())
-    warped2 = (warped2 - warped2.min()) / (warped2.max() - warped2.min())
-
-    similarity = ssim(warped1, warped2, data_range = max(warped1.max(), warped2.max()) - min(warped1.min(), warped2.min()))
-    return similarity
-
-
-# def _compute_similarity(D):
-#     return np.exp(-D[-1, -1])

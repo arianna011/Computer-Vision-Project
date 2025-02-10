@@ -12,9 +12,11 @@ class BootlegScore:
 
     staff_lines = [13,15,17,19,21,35,37,39,41,43] # locations of staff lines for both right and left hand
     # Alignment parameters
-    dtw_steps = [1,1,1,2,2,1]
+    #dtw_steps = [1,0,0,1,1,1,2,1,1,2]
+    dtw_steps = [1,1,2,1,1,2]
     dtw_weights = [1,1,2]
- 
+    #dtw_weights = [0.5,0.5,1,1,2]
+
     def __init__(self, X):
         """
         Initialize the BootlegScore with a NumPy array representing the bootleg score.
@@ -110,7 +112,6 @@ class BootlegScore:
                                                                          det.stave_feat_map_lower_bound, 
                                                                          det.stave_feat_map_upper_bound, 
                                                                          det.stave_feat_map_step)
-        
         # NOTEHEAD DETECTION
         keypoints, _ = det.detect_notehead_blobs(min_area=det.note_detect_min_area, 
                                                                   max_area = det.note_detect_max_area)
@@ -218,7 +219,8 @@ class BootlegScore:
         """
         with open(pkl_file, 'rb') as f:
             d = pickle.load(f)
-        obj = d['bscore']
+        bscore = d['bscore']
+        obj = BootlegScore(bscore)
         obj.type = "Image"
         return obj
     
@@ -266,7 +268,6 @@ class BootlegScore:
             print("ERROR: must call 'align_to_pdf' method from an 'Image' bootleg, with a 'PDF' bootleg input")
             return
         ref.num_notes = np.sum(ref.X, axis=0)
-        print(len(ref.num_notes))
         D, wp, end_cost = align.align_bootleg_scores(self.X, ref.X, ref.num_notes, BootlegScore.dtw_steps, BootlegScore.dtw_weights, optimized)
         self.aligned_to = ref
         self.cost_matr = D
