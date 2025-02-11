@@ -1,4 +1,4 @@
-import MIDI_Retrieval_System.bootleg_score as bs
+from .MIDI_Retrieval_System import bootleg_score as bs
 import time
 import os
 import multiprocessing

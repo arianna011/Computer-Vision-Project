@@ -1,5 +1,4 @@
 import numpy as np
-import os
 import pickle
 from mido import MidiFile
 from pretty_midi import PrettyMIDI

@@ -1,11 +1,7 @@
 import PIL.Image
-from MIDI_Retrieval_System import BootlegScore, MIDIProcessing, QueryProcessing, MusicalObjectDetection
-import matplotlib.pyplot as plt
-import numpy as np
-import cv2
+from .MIDI_Retrieval_System import BootlegScore
 import os
-import process_data
-import evaluation as eval
+from . import evaluation as eval
 from skimage.metrics import structural_similarity as ssim
 from mido import MidiFile
 import PIL

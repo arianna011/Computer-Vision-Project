@@ -1,9 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pickle
-from MIDI_Retrieval_System.processing_image import QueryProcessing
-from MIDI_Retrieval_System.processing_midi import MIDIProcessing
-from MIDI_Retrieval_System import alignment as align
+from .processing_image import QueryProcessing
+from .processing_midi import MIDIProcessing
+from . import alignment as align
 
 class BootlegScore:
     """

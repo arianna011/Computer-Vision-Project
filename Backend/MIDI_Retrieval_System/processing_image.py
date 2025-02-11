@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from PIL import Image, ImageFilter, ImageChops
 import matplotlib.patches as mpatches
 from scipy.signal import convolve2d
-from MIDI_Retrieval_System.musical_object_detection import MusicalObjectDetection
+from .musical_object_detection import MusicalObjectDetection
 from sklearn.cluster import KMeans
 import sys
 
