@@ -80,7 +80,10 @@ def find_author_title(file_name: str) -> tuple[str, str]:
     num_opera = int(re.search(regex_str, file_name).group(1))
 
     with open(txt_path, 'r') as file:
-        line = file.readlines()[num_opera-1]
+        line = file.readlines()
+        if num_opera >= len(line):
+            return "???", "???"
+        line = line[num_opera-1]
         line = line.split("\t")
         author, title = line[0], line[1]
 
