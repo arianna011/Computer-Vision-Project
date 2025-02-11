@@ -66,7 +66,7 @@ def find_image(img: PIL.Image.Image | str):
     midi_file = os.path.join(dir_midi, max_pair[1].replace('.pkl', '.mid'))
     interval = max_pair[2]
     print(f"Query {img}: Returning {midi_file}, interval ({interval[0]} s, {interval[1]} s)")
-    return MidiFile(midi_file), interval
+    return midi_file, interval
 
 
 def find_pdf(img: PIL.Image.Image | str):
@@ -92,7 +92,7 @@ def find_pdf(img: PIL.Image.Image | str):
     max_pair = max(all_similarity, key=lambda x: x[0])    
     pdf_file = os.path.join(dir_pdf, f"{max_pair[1].split('_')[0]}.pdf")
     print(f"Query {img}: Returning {pdf_file}")
-    return pdf_file
+    return pdf_file, None
 
 
 
