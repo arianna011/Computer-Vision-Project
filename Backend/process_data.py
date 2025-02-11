@@ -56,7 +56,7 @@ def process_all_midis(file_list: str = midi_list, out_dir: str = midi_bs_dir, re
                 bs.MIDIProcessing(f).process(outfile)
 
 
-def process_all_pdfs(file_list: str = pdf_test_list, out_dir: str = pdf_bs_test_dir, re_compute: bool = False):
+def process_all_pdfs(file_list: str = pdf_test_list, out_dir: str = pdf_bs_dir, re_compute: bool = False):
     """
     Process the batch of PDF files specified in the input file
     by converting them to bootleg scores and storing them in the output directory as .pkl files
@@ -73,14 +73,13 @@ def process_all_pdfs(file_list: str = pdf_test_list, out_dir: str = pdf_bs_test_
             f = f.rstrip()
             images = pdf2image.convert_from_path(f, dpi=400)
             out_file = f"{out_dir}/{os.path.splitext(os.path.basename(f))[0]}.pkl"
+            bscores = []
             for i, img in enumerate(images):
-                bscores = []
                 
                 if (not re_compute) and (os.path.isfile(out_file)): # file already exists
                     print(f'Skipping {out_file} - page {i}')
                 else:
                     bootleg_score_img = bs.BootlegScore.build_from_img(img)
-
 
                     print(f'Processing {out_file} - page {i}')
                     if bootleg_score_img is None:

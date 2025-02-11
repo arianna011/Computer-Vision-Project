@@ -12,10 +12,8 @@ class BootlegScore:
 
     staff_lines = [13,15,17,19,21,35,37,39,41,43] # locations of staff lines for both right and left hand
     # Alignment parameters
-    #dtw_steps = [1,0,0,1,1,1,2,1,1,2]
     dtw_steps = [1,1,2,1,1,2]
     dtw_weights = [1,1,2]
-    #dtw_weights = [0.5,0.5,1,1,2]
 
     def __init__(self, X):
         """
