@@ -12,4 +12,4 @@ We then evaluated it on our laptops and tried to add some functionalities:
 - based on our own experience with physical pages of sheet music, we also thought to add the possibility to **retrieve the entire PDF sheet music** of a piece from a picture capturing a single page of it, so that, for example, we can find out which piece an isolated page of sheet music fallen on the floor belongs to (this functionality can be found in _Backend\main.py_).
 
 Finally, we developed a small app, called **Image2Midi**, to leverage the MIDI Retrieval system in a practical way. A user can use this app to take pictures of sheet music, or load them from his gallery, adjust and crop them, hear MIDI passages corresponding to the pictures, downloading the MIDI file of the entire piece or the PDF of the corresponding sheet music, and visualizing all the previously downloaded files.
-The implementation of the app can be found in the _App\_ directory.
+The implementation of the app can be found in the _App_ directory.
