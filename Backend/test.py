@@ -1,12 +1,9 @@
 from MIDI_Retrieval_System import BootlegScore, MIDIProcessing, QueryProcessing, MusicalObjectDetection
 import matplotlib.pyplot as plt
 import numpy as np
-import cv2
 import os
-import process_data
 import evaluation as eval
-import pdf2image
-from main import find_image, find_pdf, main
+from main import find_image, main
 import time
 from multiprocessing import Pool
 from multiprocessing import cpu_count

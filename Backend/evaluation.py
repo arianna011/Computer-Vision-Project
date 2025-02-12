@@ -1,4 +1,4 @@
-import process_data as pd
+from . import process_data as pd
 import glob
 import numpy as np
 import matplotlib.pyplot as plt
