@@ -3,7 +3,10 @@
 This is a project for the _Computer Vision_ course at Sapienza a.y. 2024/2025 by Arianna Paolini (1943164), Michele Saraceno (1905065) and Federica Sinisi (1946981).
 We based our work on the paper [Using Cell Phone Pictures of Sheet Music To Retrieve MIDI Passages](https://arxiv.org/abs/2004.11724) by Daniel Yang, Thitaree Tanprasert, Teerapat Jenrungrot, Mengyi Shan and TJ Tsai:
 
-![img](/img.png)
+<p align="center">
+  <img src="\img.png" width="300" height="200">
+</p>
+
 
 we first studied and re-organized their code to implement the **MIDI Retrieval system** (in the directory _Backend\MIDI_Retrieval_System_), which takes in input a query cellphone image of sheet music and returns the temporal segment of the MIDI file of the corresponding piece that best matches the picture. 
 
