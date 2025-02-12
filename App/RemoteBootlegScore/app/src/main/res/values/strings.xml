@@ -1,0 +1,38 @@
+<resources>
+    <string name="app_name">Image2Midi</string>
+
+    <string name="camera_button">CameraBtn</string>
+    <string name="gallery_button">GalleryBtn</string>
+    <string name="home_button">HomeBtn</string>
+    <string name="apply_crop_button">ApplyCropBtn</string>
+    <string name="midi_button">MidiBtn</string>
+    <string name="find_midi_button">Find MIDI</string>
+    <string name="find_pdf_button">Find PDF</string>
+    <string name="play_pause_button">PlayPauseBtn</string>
+
+    <string name="pdf_content_descriptor">PDF</string>
+
+    <string name="apply_crop_button_txt">apply</string>
+
+    <string name="captured_img">CapturedImg</string>
+
+    <string name="title">Image2Midi - The App</string>
+    <string name="credits">a project made by\nArianna Paolini\nFederica Sinisi\nMichele Saraceno</string>
+
+    <string name="beta">beta</string>
+    <string name="crop_instructions">select the 4 points to crop the image (TL, TR, BR, BL)</string>
+
+    <string name="midi_reproduction">Midi player</string>
+
+    <string name="error_image">Error: invalid image to calculate the bootleg score </string>
+    <string name="error_camera">Error: unable to start camera</string>
+    <string name="error_server">Error: failed connection with the server</string>
+    <string name="error_gallery">Error: unable to load the image from the gallery</string>
+    <string name="error_cropping">Error: unable to crop the image</string>
+    <string name="error_pdf">Error: there are issues with the PDF</string>
+
+
+    <string name="author_title">%1$s - %2$s</string>
+    <string name="author_title_pdf">%1$s_%2$s.pdf</string>
+
+</resources>

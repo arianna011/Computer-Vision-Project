@@ -9,19 +9,22 @@ import pdf2image
 import pickle
 import numpy as np
 
+from PIL import Image
+Image.MAX_IMAGE_PIXELS = None
+
 """
 Functions to process the query images in the dataset
 """
 
 # standard directories for processing
-query_list = 'cfg_files/query.train.list' # list of query images paths
-midi_list = 'cfg_files/midi.train.list' # list of midi files paths
-pdf_list = 'cfg_files/pdf.train.list' # list of pdf files paths
+query_list = 'Backend/cfg_files/query.train.list' # list of query images paths
+midi_list = 'Backend/cfg_files/midi.train.list' # list of midi files paths
+pdf_list = 'Backend/cfg_files/pdf.train.list' # list of pdf files paths
 midi_bs_dir = 'experiments/train/db' # directory containing midi bootleg scores
 out_dir = 'experiments/train/hyp' # where to save hypothesis output files
 pdf_bs_dir = 'experiments/train/pdf' # directory containing pdf bootleg scores
 
-pdf_test_list = 'cfg_files/pdf.test.list' # list of pdf files paths
+pdf_test_list = 'Backend/cfg_files/pdf.test.list' # list of pdf files paths
 pdf_bs_test_dir = 'experiments/test/pdf' # directory containing pdf bootleg scores
 
 score_info = 'data/score_info'
@@ -71,7 +74,10 @@ def process_all_pdfs(file_list: str = pdf_test_list, out_dir: str = pdf_bs_dir, 
     with open(file_list, 'r') as file:
         for f in file:
             f = f.rstrip()
-            images = pdf2image.convert_from_path(f, dpi=400)
+            try:
+                images = pdf2image.convert_from_path(f, dpi=400)
+            except:
+                continue
             out_file = f"{out_dir}/{os.path.splitext(os.path.basename(f))[0]}.pkl"
             bscores = []
             for i, img in enumerate(images):
@@ -91,7 +97,7 @@ def process_all_pdfs(file_list: str = pdf_test_list, out_dir: str = pdf_bs_dir, 
                 print(f'Saving {out_file}')
                 bscore = np.concatenate(bscores, axis=1)
                 d = {
-                        'bscore': bscore,
+                    'bscore': bscore,
                     }
                 with open(out_file, 'wb') as file:
                     pickle.dump(d, file)

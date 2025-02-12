@@ -1,13 +1,10 @@
-from MIDI_Retrieval_System import BootlegScore, MIDIProcessing, QueryProcessing, MusicalObjectDetection
+from .MIDI_Retrieval_System import BootlegScore, MIDIProcessing, QueryProcessing, MusicalObjectDetection
 import matplotlib.pyplot as plt
 import numpy as np
 import os
-import evaluation as eval
-from main import find_image, main
+from .main import find_image
 import time
-from multiprocessing import Pool
-from multiprocessing import cpu_count
-
+from . import process_data
 
 def test_bootleg_score(midi_file):
     # visualize bootleg score
@@ -179,46 +176,36 @@ def _correct_predict(file_name, query_name):
     return piece_query == piece_midi
    
 
-if __name__ == "__main__":
-
+def main():
     # random examples
     midi_file = './data/midi/p91.mid'
+    img_file = 'data/queries/p138_q6.jpg'
     midi_db_dir = 'experiments/train/db'
-
-    test_file = 'data/queries/p2_q1_test2.jpg'
-    test_file1 = 'data/queries/p2_test3.jpg'
-    test_file2 = 'data/queries/p2_test4.jpg'
-    test_file3 = 'data/queries/p2_test5.jpg'
-    test_file4 = 'data/queries/p2_test6.jpg'
 
     #test_all_query_bootleg_generation(img_file, verbose=False)
 
     #bs_score_midi = BootlegScore.build_from_midi(midi_file)
     #bs_score_midi.visualize_long(MIDIProcessing.staff_lines_both, chuncks_sz=500) # many images
 
+    #bs_score_query = BootlegScore.build_from_img(img_file)
     #bs_score_query.visualize(QueryProcessing.staff_lines_both)
 
     ### save pdfs' bootleg scores as pickle files
-    #process_data.process_all_pdfs()
+    process_data.process_all_pdfs()
 
     ### test pdf to image
-
-    #main(images[0], 'MIDI')
+    #images = pdf2image.convert_from_path('./data/pdfs/p1.pdf', dpi=300)
+    #find_image(images[0], 'MIDI')
 
     ### test find pdf
-    #start = time.time()
-    #pdf = find_pdf(test_file3)
-    #end = time.time()
-    #print(f"PDF: {pdf}, time: {end - start:.4f} secondi")  
+    #find_image(img_file, 'PDF')
 
-    ### test find midi 
-    start = time.time()
-    midi, interval = find_image(test_file3)
-    end = time.time()
+    # start = time.time()
+    # midi, interval = find_image(img_file)
+    # end = time.time()
 
-    print(f"Runtime: {end - start:.4f} secondi")
-    #print(f"MIDI: {midi.filename}, Interval: {interval}")
-    
+    # print(f"Runtime: {end - start:.4f} secondi")
 
     #test_all_midi_retrieval()
     #test_all_pdf_retrieval()
+    
