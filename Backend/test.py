@@ -5,6 +5,9 @@ import os
 import evaluation as eval
 from main import find_image, main
 import time
+from multiprocessing import Pool
+from multiprocessing import cpu_count
+
 
 def test_bootleg_score(midi_file):
     # visualize bootleg score
@@ -118,32 +121,61 @@ def test_all_query_bootleg_generation(img_file, verbose=True):
 
 
 def test_all_midi_retrieval():
+    """
+    Test the retrieval of all midi files in the database using the queries in the 'data/queries' folder and evaluate the accuracy of the retrieval
+    """
     start = time.time()
     queries = [os.path.join('data/queries', q) for q in os.listdir('data/queries')]
+    queries = queries[:400]
     c=0
     for q in queries:
         midi, interval = find_image(q)
         if not _correct_predict(midi.filename, q):
-            print(f'Failed query: {q}, Matched MIDI: {midi.filename}')
             c += 1 
 
     print(f'Total Errors: {c}')
+    print(f'Total Queries: {len(queries)}')
+    print(f'Accuracy: {1 - c/len(queries)}')
     end = time.time()
     print(f"Runtime: {end - start:.4f} secondi")
+    print(queries)
 
 
 def test_all_pdf_retrieval():
+    """
+    Test the retrieval of all pdf files in the database using the queries in the 'data/queries' folder and evaluate the accuracy of the retrieval
+    """
     start = time.time()
-    queries = [os.path.join('data/queries', q) for q in os.listdir('data/queries')]
-    for q in queries:
-        pdf = main(q, "PDF")
+    with open('cfg_files/query.train.list', 'r') as file:
+        c = 0
+        n = 0
+        for f in file:
+            n += 1
+            f = f.rstrip()
+            pdf = find_pdf(f)
+            if not _correct_predict(pdf, f):
+                c += 1
+            print(c,n)
+    print(f'Total Errors: {c}')
+    print(f'Total Queries: {n}')
+    print(f'Accuracy: {1 - c/n}')
     end = time.time()
     print(f"Runtime: {end - start:.4f} secondi")
 
-def _correct_predict(midi_name, query_name):
-    piece_query = "".join([c for c in query_name.split() if c.isdigit()])
-    piece_midi = "".join([c for c in midi_name.split() if c.isdigit()])
-    print(piece_query)
+def _correct_predict(file_name, query_name):
+    """
+    Check if the file retrieved (pdf or midi) corresponds to the query image
+
+    Args:
+        file_name (str): name of the file retrieved
+        query_name (str): name of the query image
+    
+    Returns:
+        bool: True if the file retrieved corresponds to the query image, False otherwise
+    """
+    query_name = query_name.split('_')[0]
+    piece_query = "".join([c for c in query_name if c.isdigit()])
+    piece_midi = "".join([c for c in midi_name if c.isdigit()])
     return piece_query == piece_midi
    
 
@@ -151,32 +183,42 @@ if __name__ == "__main__":
 
     # random examples
     midi_file = './data/midi/p91.mid'
-    img_file = 'data/queries/p138_q6.jpg'
     midi_db_dir = 'experiments/train/db'
+
+    test_file = 'data/queries/p2_q1_test2.jpg'
+    test_file1 = 'data/queries/p2_test3.jpg'
+    test_file2 = 'data/queries/p2_test4.jpg'
+    test_file3 = 'data/queries/p2_test5.jpg'
+    test_file4 = 'data/queries/p2_test6.jpg'
 
     #test_all_query_bootleg_generation(img_file, verbose=False)
 
     #bs_score_midi = BootlegScore.build_from_midi(midi_file)
     #bs_score_midi.visualize_long(MIDIProcessing.staff_lines_both, chuncks_sz=500) # many images
 
-    #bs_score_query = BootlegScore.build_from_img(img_file)
     #bs_score_query.visualize(QueryProcessing.staff_lines_both)
 
     ### save pdfs' bootleg scores as pickle files
     #process_data.process_all_pdfs()
 
     ### test pdf to image
-    #images = pdf2image.convert_from_path('./data/pdfs/p1.pdf', dpi=300)
-    #find_image(images[0], 'MIDI')
+
+    #main(images[0], 'MIDI')
 
     ### test find pdf
-    #find_image(img_file, 'PDF')
+    #start = time.time()
+    #pdf = find_pdf(test_file3)
+    #end = time.time()
+    #print(f"PDF: {pdf}, time: {end - start:.4f} secondi")  
 
-    # start = time.time()
-    # midi, interval = find_image(img_file)
-    # end = time.time()
+    ### test find midi 
+    start = time.time()
+    midi, interval = find_image(test_file3)
+    end = time.time()
 
-    # print(f"Runtime: {end - start:.4f} secondi")
+    print(f"Runtime: {end - start:.4f} secondi")
+    #print(f"MIDI: {midi.filename}, Interval: {interval}")
+    
 
     #test_all_midi_retrieval()
-    test_all_pdf_retrieval()
+    #test_all_pdf_retrieval()

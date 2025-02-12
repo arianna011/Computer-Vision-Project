@@ -49,6 +49,7 @@ def align_bootleg_scores(query: np.ndarray, ref: np.ndarray, num_ref_notes: int,
                       each entry D[i, j] represents the minimum cost to align the first i frames of query with the first j frames of ref
         (np.ndarray): the optimal warping path, of dim = (n_steps x 2), represented as a sequence of (query_frame_index, ref_frame_index) pairs;
                       each pair shows which frame in the query aligns with which frame in the ref
+        (float): the total cost of the optimal alignment
     """
     if optimized: # Cython implementation
         # set params
@@ -74,7 +75,7 @@ def align_bootleg_scores(query: np.ndarray, ref: np.ndarray, num_ref_notes: int,
         steps = np.array(steps).reshape((-1,2))
         D, wp = lb.sequence.dtw(query, ref, step_sizes_sigma = steps, weights_mul = weights, subseq = True, metric = cost_metric)
     
-    return D, wp     
+    return D, wp, end_cost     
 
 
 def plot_alignment(D: np.ndarray, wp: np.ndarray, seg_info: tuple[tuple[float,float], list[tuple[float,float]], list[tuple[float, float]]] = None, fig_sz: tuple[int, int] = (10,10)):

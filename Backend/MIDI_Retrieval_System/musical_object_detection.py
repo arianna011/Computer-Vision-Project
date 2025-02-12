@@ -259,10 +259,8 @@ class MusicalObjectDetection:
 
         keypoints = detector.detect(img)
         
-        #print(f'Number of keypoints detected: {len(keypoints)}')
         im_with_keypoints = cv2.drawKeypoints(np.array(img), keypoints, np.array([]), (0,0,255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-        #cv2.imshow('image',im_with_keypoints)
-        #cv2.waitKey(0)  
+
         return keypoints, im_with_keypoints 
     
 

@@ -7,6 +7,7 @@ import glob
 import pretty_midi
 import pdf2image
 import pickle
+import numpy as np
 
 """
 Functions to process the query images in the dataset
@@ -19,6 +20,9 @@ pdf_list = 'cfg_files/pdf.train.list' # list of pdf files paths
 midi_bs_dir = 'experiments/train/db' # directory containing midi bootleg scores
 out_dir = 'experiments/train/hyp' # where to save hypothesis output files
 pdf_bs_dir = 'experiments/train/pdf' # directory containing pdf bootleg scores
+
+pdf_test_list = 'cfg_files/pdf.test.list' # list of pdf files paths
+pdf_bs_test_dir = 'experiments/test/pdf' # directory containing pdf bootleg scores
 
 score_info = 'data/score_info'
 pdf_dir = 'data/pdfs' # directory containing pdf files
@@ -52,7 +56,7 @@ def process_all_midis(file_list: str = midi_list, out_dir: str = midi_bs_dir, re
                 bs.MIDIProcessing(f).process(outfile)
 
 
-def process_all_pdfs(file_list: str = pdf_list, out_dir: str = pdf_bs_dir, re_compute: bool = False):
+def process_all_pdfs(file_list: str = pdf_test_list, out_dir: str = pdf_bs_dir, re_compute: bool = False):
     """
     Process the batch of PDF files specified in the input file
     by converting them to bootleg scores and storing them in the output directory as .pkl files
@@ -67,30 +71,31 @@ def process_all_pdfs(file_list: str = pdf_list, out_dir: str = pdf_bs_dir, re_co
     with open(file_list, 'r') as file:
         for f in file:
             f = f.rstrip()
-            images = pdf2image.convert_from_path(f, dpi=300)
+            images = pdf2image.convert_from_path(f, dpi=400)
+            out_file = f"{out_dir}/{os.path.splitext(os.path.basename(f))[0]}.pkl"
+            bscores = []
             for i, img in enumerate(images):
-                out_file = f"{out_dir}/{os.path.splitext(os.path.basename(f))[0]}_{i}.pkl"
                 
                 if (not re_compute) and (os.path.isfile(out_file)): # file already exists
-                    print(f'Skipping {out_file}')
+                    print(f'Skipping {out_file} - page {i}')
                 else:
                     bootleg_score_img = bs.BootlegScore.build_from_img(img)
 
-                    print(f'Processing {out_file}')
+                    print(f'Processing {out_file} - page {i}')
                     if bootleg_score_img is None:
-                        print(f'No bootleg score found for {out_file}')
+                        print(f'No bootleg score found for {out_file} - page {i}')
                         continue
-                    # saving to file
-                    d = {
-                            'bscore': bootleg_score_img,
-                        }
-                    with open(out_file, 'wb') as file:
-                        pickle.dump(d, file)
+                    bscores.append(bootleg_score_img.X)
+            if bscores != []:
+                # saving to file
+                print(f'Saving {out_file}')
+                bscore = np.concatenate(bscores, axis=1)
+                d = {
+                        'bscore': bscore,
+                    }
+                with open(out_file, 'wb') as file:
+                    pickle.dump(d, file)
                 
-                    
-
-
-
 
 def process_all_queries(query_list: str = query_list, midi_bs_dir: str = midi_bs_dir, out_dir: str = out_dir, re_compute: bool = False) -> list[tuple[float, float]]:
     """
