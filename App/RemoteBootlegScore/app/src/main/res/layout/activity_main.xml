@@ -1,0 +1,340 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#E7E7E6">
+
+    <Button
+        android:id="@+id/serverip"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:layout_alignEnd="@id/colored_bar"
+        android:layout_marginTop="60dp"
+        android:visibility="visible"
+        style="@style/Widget.AppCompat.Button"
+        android:elevation="40000dp"/>
+
+    <View
+        android:id="@+id/colored_bar"
+        android:layout_width="match_parent"
+        android:layout_height="80dp"
+        android:layout_alignParentBottom="true"
+        android:background="#531253" />
+
+    <ImageButton
+        android:id="@+id/capture_button"
+        android:layout_width="80dp"
+        android:layout_height="80dp"
+        android:padding="10dp"
+        android:elevation="5dp"
+        android:layout_alignParentBottom="true"
+        android:layout_centerHorizontal="true"
+        android:layout_marginBottom="32dp"
+        android:background="@drawable/photo_btn"
+        android:contentDescription="@string/camera_button"
+        android:scaleType="centerInside"
+        android:src="@drawable/camera_png"/>
+
+    <ImageButton
+        android:id="@+id/gallery_button"
+        android:layout_width="60dp"
+        android:layout_height="60dp"
+        android:padding="10dp"
+        android:elevation="5dp"
+        android:layout_alignParentBottom="true"
+        android:layout_centerHorizontal="false"
+        android:layout_alignEnd="@id/colored_bar"
+        android:layout_marginEnd="40dp"
+        android:layout_marginBottom="40dp"
+        android:background="@drawable/photo_btn"
+        android:contentDescription="@string/gallery_button"
+        android:scaleType="centerInside"
+        android:src="@drawable/gallery_png"
+        />
+
+    <ImageButton
+        android:id="@+id/midi_button"
+        android:layout_width="60dp"
+        android:layout_height="60dp"
+        android:layout_alignParentBottom="true"
+        android:layout_centerHorizontal="false"
+        android:padding="5dp"
+        android:elevation="5dp"
+        android:layout_alignStart="@id/colored_bar"
+        android:layout_marginStart="40dp"
+        android:layout_marginBottom="40dp"
+        android:background="@drawable/photo_btn"
+        android:contentDescription="@string/gallery_button"
+        android:src="@drawable/midi_png"
+        android:scaleType="fitCenter"
+        />
+
+    <ImageButton
+        android:id="@+id/home_button"
+        android:layout_width="30dp"
+        android:layout_height="30dp"
+        android:elevation="10dp"
+        android:padding="8dp"
+        android:layout_alignTop="@id/captured_img"
+        android:layout_marginStart="30dp"
+        android:layout_marginTop="30dp"
+        android:visibility="gone"
+        android:background="@drawable/photo_btn"
+        android:src="@drawable/x_png"
+        android:contentDescription="@string/home_button"
+        android:scaleType="centerInside"
+        />
+
+    <ImageButton
+        android:id="@+id/crop_button"
+        android:layout_width="30dp"
+        android:layout_height="30dp"
+        android:padding="8dp"
+        android:elevation="10dp"
+        android:layout_below="@id/home_button"
+        android:layout_marginTop="20dp"
+        android:layout_alignStart="@id/home_button"
+        android:visibility="gone"
+        android:background="@drawable/photo_btn"
+        android:src="@drawable/crop_png"
+        android:contentDescription="@string/home_button"
+        android:scaleType="centerInside"
+        />
+
+    <TextView
+        android:id="@+id/title"
+        android:visibility="visible"
+        android:layout_width="400dp"
+        android:layout_height="wrap_content"
+        android:layout_centerHorizontal="true"
+        android:layout_centerVertical="true"
+        android:textAlignment="center"
+        android:fontFamily="sans-serif-condensed-medium"
+        android:text="@string/title"
+        android:textSize="34sp"/>
+
+    <TextView
+        android:id="@+id/credits"
+        android:visibility="visible"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/title"
+        android:layout_alignEnd="@id/title"
+        android:fontFamily="sans-serif-condensed-medium"
+        android:textAlignment="viewEnd"
+        android:layout_marginTop="0dp"
+
+        android:layout_marginEnd="26dp"
+        android:text="@string/credits" />
+
+    <TextView
+        android:id="@+id/error"
+        android:visibility="gone"
+        android:layout_width="400dp"
+        android:layout_height="wrap_content"
+        android:layout_centerHorizontal="true"
+        android:layout_alignTop="@id/capture_button"
+        android:layout_marginTop="-100dp"
+        android:textAlignment="center"
+        android:fontFamily="sans-serif-condensed-medium"
+        android:text=""
+        android:textSize="20sp"/>
+
+    <ImageView
+        android:id="@+id/captured_img"
+        android:layout_width="390dp"
+        android:layout_height="526dp"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="64dp"
+        android:contentDescription="@string/captured_img"
+        android:scaleType="centerCrop"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/server_interaction_buttons"
+        android:layout_width="wrap_content"
+        android:layout_height="60dp"
+        android:visibility="gone"
+        android:layout_alignBottom="@id/captured_img"
+        android:layout_centerHorizontal="true"
+        android:orientation="horizontal"
+        android:layout_marginBottom="-60dp">
+
+        <Button
+            android:id="@+id/send_to_server_button_midi"
+            android:textColor="@color/black"
+            style="@style/Widget.AppCompat.Button.Colored"
+            android:backgroundTint="@color/purple_200"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/find_midi_button" />
+
+        <Button
+            android:id="@+id/send_to_server_button_pdf"
+            android:layout_width="wrap_content"
+            android:textColor="@color/black"
+            android:backgroundTint="@color/purple_200"
+            style="@style/Widget.AppCompat.Button.Colored"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:text="@string/find_pdf_button"
+            />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/player_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_centerHorizontal="true"
+        android:layout_alignTop="@id/capture_button"
+        android:layout_marginTop="-100dp"
+        android:visibility="gone"
+        android:elevation="10dp"
+        android:background="@null"
+        android:clipChildren="false">
+
+        <TextView
+            android:id="@+id/auth_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/midi_reproduction"
+            android:layout_marginStart="30dp"
+            android:layout_marginBottom="-15dp"/>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="20dp"
+            android:layout_marginEnd="20dp"
+            android:layout_marginStart="20dp"
+            android:padding="10dp"
+            android:background="@drawable/rounded_layout">
+
+            <ImageView
+                android:id="@+id/play_pause_button"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:layout_marginStart="10dp"
+                android:contentDescription="@string/play_pause_button"
+                android:scaleType="fitCenter"
+                android:background="@drawable/play_png"
+                />
+
+            <SeekBar
+                android:id="@+id/seek_bar"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_gravity="center_vertical"
+                android:thumbTint="@color/purple_200"
+                android:progressBackgroundTint="@color/purple_200"
+                android:progressTint="@color/purple_200"
+                />
+
+            <ImageButton
+                android:id="@+id/download_button_midi"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:layout_marginStart="10dp"
+                android:contentDescription="@string/play_pause_button"
+                android:scaleType="fitCenter"
+                android:background="@drawable/download_btn"
+                />
+
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/pdf_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_centerHorizontal="true"
+        android:layout_alignTop="@id/capture_button"
+        android:layout_marginTop="-100dp"
+        android:visibility="gone"
+        android:elevation="10dp"
+        android:background="@null"
+        android:clipChildren="false">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="PDF"
+            android:layout_marginStart="30dp"
+            android:layout_marginBottom="-20dp"/>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="20dp"
+            android:layout_marginEnd="20dp"
+            android:layout_marginStart="20dp"
+            android:padding="10dp"
+            android:background="@drawable/rounded_layout">
+
+            <ImageView
+                android:id="@+id/pdf_icon"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:layout_marginStart="10dp"
+                android:layout_marginTop="5dp"
+                android:contentDescription="@string/pdf_content_descriptor"
+                android:scaleType="fitCenter"
+                android:background="@drawable/pdf_png"
+                />
+
+            <TextView
+                android:id="@+id/pdf_name"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="10dp"
+                android:layout_gravity="center_vertical"
+                android:text="@string/author_title_pdf"
+                />
+
+            <Button
+                android:id="@+id/open_pdf"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:textColor="@color/black"
+                android:backgroundTint="@color/purple_200"
+                style="@style/Widget.AppCompat.Button.Colored"
+                android:text="Open" />
+
+            <ImageButton
+                android:id="@+id/download_button_pdf"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:layout_marginEnd="10dp"
+                android:layout_marginTop="5dp"
+                android:contentDescription="@string/play_pause_button"
+                android:scaleType="fitCenter"
+                android:background="@drawable/download_png"
+                />
+
+        </LinearLayout>
+    </LinearLayout>
+
+    <View
+        android:id="@+id/loading_overlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#80000000"
+        android:elevation="100dp"
+        android:visibility="gone" />
+
+    <ProgressBar
+        android:id="@+id/loading_spinner"
+        style="?android:attr/progressBarStyleLarge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        android:elevation="100dp"
+        android:layout_centerInParent="true"/>
+</RelativeLayout>

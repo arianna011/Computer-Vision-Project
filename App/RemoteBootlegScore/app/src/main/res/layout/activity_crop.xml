@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#E7E7E6">
+
+    <ImageView
+        android:id="@+id/image_to_crop"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerHorizontal="true"
+        android:layout_centerVertical="true"
+        android:contentDescription="@string/captured_img"
+        android:scaleType="centerCrop"
+        android:visibility="visible" />
+
+    <Button
+        android:id="@+id/applyCropButton"
+        android:layout_width="match_parent"
+        android:layout_height="80dp"
+        android:layout_alignParentBottom="true"
+        android:background="#531253"
+        android:contentDescription="@string/apply_crop_button"
+        android:text="@string/apply_crop_button_txt"
+        android:textSize="50sp"
+        />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/beta"
+        android:layout_marginEnd="10dp"
+        android:layout_marginTop="-30dp"
+        android:layout_alignEnd="@id/applyCropButton"
+        android:layout_alignTop="@id/applyCropButton"
+        android:elevation="5dp"
+        android:textColor="@color/black"/>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/crop_instructions"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="100dp"
+        android:elevation="5dp"
+        android:textColor="@color/black"/>
+
+
+</RelativeLayout>

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#E7E7E6">
+
+    <EditText
+        android:id="@+id/ip_address"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:autofillHints="192.168.196.228"
+        android:hint="192.168.196.228"
+        android:inputType="text"
+        android:layout_marginBottom="10dp"
+        android:layout_marginTop="200dp"
+        android:textColor="@color/black"
+        android:padding="10dp"
+        android:background="@android:drawable/edit_text"
+        android:layout_alignParentTop="true"/>
+
+    <EditText
+        android:id="@+id/port"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:autofillHints="192.168.196.228"
+        android:hint="6969"
+        android:textColor="@color/black"
+        android:inputType="text"
+        android:layout_marginBottom="10dp"
+        android:padding="10dp"
+        android:background="@android:drawable/edit_text"
+        android:layout_below="@+id/ip_address"/>
+
+    <Button
+        android:id="@+id/send_button"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Send"
+        android:layout_below="@id/port"
+        android:backgroundTint="#6200EE"
+        android:textColor="#FFFFFF"
+        android:padding="10dp"/>
+</RelativeLayout>

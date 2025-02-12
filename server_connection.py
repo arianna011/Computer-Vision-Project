@@ -85,6 +85,7 @@ def find_author_title(file_name: str) -> tuple[str, str]:
             return "???", "???"
         line = line[num_opera-1]
         line = line.split("\t")
+        print(f"{num_opera=} {line=}")
         author, title = line[0], line[1]
 
     print(f"{num_opera=}")

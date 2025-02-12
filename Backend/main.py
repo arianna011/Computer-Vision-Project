@@ -6,6 +6,7 @@ from skimage.metrics import structural_similarity as ssim
 from mido import MidiFile
 import PIL
 from multiprocessing import Pool
+import numpy as np
 
 
 def main(img: PIL.Image.Image | str, option: str) -> tuple[MidiFile, tuple[float, float]]:
