@@ -4,7 +4,7 @@ This is a project for the _Computer Vision_ course at Sapienza a.y. 2024/2025 by
 We based our work on the paper [Using Cell Phone Pictures of Sheet Music To Retrieve MIDI Passages](https://arxiv.org/abs/2004.11724) by Daniel Yang, Thitaree Tanprasert, Teerapat Jenrungrot, Mengyi Shan and TJ Tsai:
 
 <p align="center">
-  <img src="\img.png" width="300" height="200">
+  <img src="\img.png" width="400" height="200">
 </p>
 
 
